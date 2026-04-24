@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Underhill Phonemic Chart – Interactive Jigsaw</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  :root{
+    --cell: 68px;
+    --gap: 6px;
+
+    /* Category colours */
+    --mono-colour: #d7f9d2;
+    --dip-colour:  #ffe9cc;
+    --cons-colour: #dde9ff;
+
+    /* Voiced/unvoiced shading (blue scale) */
+    --unvoiced-blue: #e3f2fd;
+    --voiced-blue:   #90caf9;
+
+    /* Auto-check colours */
+    --ok:#2e7d32;
+    --bad:#c62828;
+  }
+
+  body{font-family:Arial,sans-serif;background:#f7f7f8;padding:20px;}
+  h1,h2{text-align:center;}
+
+  .topbar{
+    display:flex;justify-content:center;gap:18px;flex-wrap:wrap;margin-bottom:18px;
+  }
+  label{display:flex;align-items:center;gap:8px;font-weight:600;}
+
+  button{
+    background:#106ebe;color:#fff;padding:8px 12px;border:none;border-radius:8px;cursor:pointer;font-weight:600;
+  }
+
+  .wrapper{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start;justify-content:center;}
+  .wrapper>div{display:flex;flex-direction:column;align-items:center;}
+
+  /* TILE BANK (5 columns, fixed size) */
+  #tiles{
+    width:360px;min-height:400px;max-height:600px;overflow-y:auto;
+    display:grid !important;grid-template-columns:repeat(5,60px);grid-auto-rows:60px;gap:8px;
+    background:#fff;border:1px solid #ccc;border-radius:10px;padding:10px;
+  }
+  .tile{
+    background:#fff;border:2px solid #000;border-radius:8px;cursor:grab;touch-action:none;
+    width:60px !important;height:60px !important;
+    display:flex !important;align-items:center;justify-content:center;
+    font-size:26px;box-sizing:border-box;flex:0 0 auto !important;
+  }
+.tile.dragging {
+    opacity: 0.6 !important;
+    filter: grayscale(100%);
+    border-color: #777 !important;
+    box-shadow: 0 0 6px rgba(0,0,0,0.3) inset;
+}
+  /* BOARD */
+  #board{
+    display:grid;gap:var(--gap);grid-template-columns:repeat(8,var(--cell));
+    background:#fff;padding:12px;border:1px solid #ccc;border-radius:10px;
+  }
+  .cell{
+    width:var(--cell);height:var(--cell);border:2px dashed #999;border-radius:8px;display:flex;align-items:center;justify-content:center;
+    font-size:26px;background:#fff;position:relative;touch-action:none;
+  }
+  .cell.hover{background:#eefbf0;border-color:#000;}
+  .cell.correct{box-shadow:inset 0 0 0 2px var(--ok);}
+  .cell.incorrect{animation:flash .25s linear 2;}
+  @keyframes flash{50%{background:#fdecea;border-color:var(--bad);}}
+
+  /* (Old banner can stay hidden if you keep it)
+  #celebrate{display:none;background:#fff8c4;border:2px solid #ffb300;border-radius:10px;padding:15px;margin-bottom:15px;font-size:24px;text-align:center;font-weight:bold;} */
+
+  /* MODAL */
+  #congrats-overlay{
+    position:fixed;inset:0;background:rgba(0,0,0,0.55);
+    display:none;align-items:center;justify-content:center;z-index:9999;
+  }
+  #congrats-modal{
+    background:#fff;padding:30px 40px;border-radius:12px;font-size:22px;text-align:center;
+    border:3px solid #ffcc33;box-shadow:0 0 20px rgba(0,0,0,0.25);
+  }
+  #congrats-modal button{
+    margin-top:15px;padding:10px 20px;border:none;background:#106ebe;color:#fff;border-radius:8px;cursor:pointer;font-size:18px;
+  }
+  /* Modal animation: fade + scale pop */
+#congrats-overlay.show #congrats-modal {
+    animation: modalPop 0.35s ease-out forwards;
+}
+
+@keyframes modalPop {
+    0% {
+        opacity: 0;
+        transform: scale(0.75);
+    }
+    60% {
+        opacity: 1;
+        transform: scale(1.05);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Optional: fade-in effect for backdrop */
+#congrats-overlay {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+#congrats-overlay.show {
+    opacity: 1;
+}
+</style>
+</head>
+
+<body>
+
+<!-- (Optional) Old banner (unused now)
+<div id="celebrate">🎉 Brilliant work — the chart is complete! 🎉</div> -->
+
+<!-- MODAL -->
+<div id="congrats-overlay" style="display:none;">
+  <div id="congrats-modal">
+    <p>🎉 Brilliant work — the chart is complete! 🎉</p>
+    <button id="closeCongrats">OK</button>
+  </div>
+</div>
+
+<h1>Underhill Phonemic Chart – Interactive Jigsaw</h1>
+
+<div class="topbar">
+  <label><input type="checkbox" id="autoCheck" checked> Auto-check</label>
+
+  <!-- INLINE colour & voicing (voicing greyed until colour ON) -->
+  <label><input type="checkbox" id="colourLocations"> Colour-code locations</label>
+  <label id="voicingLabel" style="opacity:.5; pointer-events:none;">
+    <input type="checkbox" id="shadeVoicing"> Show voicing shading
+  </label>
+
+  <button id="resetBtn">Reset</button>
+</div>
+
+<div class="wrapper">
+  <div>
+    <h2>Tiles</h2>
+    <div id="tiles"></div>
+  </div>
+  <div>
+    <h2>Board</h2>
+    <div id="board"></div>
+  </div>
+</div>
+
+<script>
+/* ---------- DATA ---------- */
+const EXPECTED = [
+  "iː","ɪ","ʊ","uː","ɪə","eɪ","","",
+  "e","ə","ɜː","ɔː","ʊə","ɔɪ","əʊ","",
+  "æ","ʌ","ɑː","ɒ","eə","aɪ","aʊ","",
+  "p","b","t","d","tʃ","dʒ","k","g",
+  "f","v","θ","ð","s","z","ʃ","ʒ",
+  "m","n","ŋ","h","l","r","w","j"
+];
+const MONO = ["iː","ɪ","ʊ","uː","e","ə","ɜː","ɔː","æ","ʌ","ɑː","ɒ"];
+const DIP  = ["ɪə","eɪ","ʊə","ɔɪ","əʊ","eə","aɪ","aʊ"];
+const CONS = ["p","b","t","d","tʃ","dʒ","k","g","f","v","θ","ð","s","z","ʃ","ʒ","m","n","ŋ","h","l","r","w","j"];
+const UNVOICED_OBS = ["p","t","tʃ","k","f","θ","s","ʃ","h"];
+const VOICED_OBS   = ["b","d","dʒ","g","v","ð","z","ʒ"];
+const TILE_SET = [...MONO, ...DIP, ...CONS];
+
+/* ---------- BUILD BOARD ---------- */
+const board    = document.getElementById("board");
+const tileBank = document.getElementById("tiles");
+
+function createCell(expected){
+  const c = document.createElement("div");
+  c.className = "cell";
+  c.dataset.expected = expected;
+
+  c.addEventListener("dragover", e => { e.preventDefault(); c.classList.add("hover"); });
+  c.addEventListener("dragleave", () => c.classList.remove("hover"));
+  c.addEventListener("drop", e => {
+    e.preventDefault();
+    c.classList.remove("hover","correct","incorrect");
+
+    const id   = e.dataTransfer.getData("text/id");
+    const tile = document.getElementById(id);
+    if (!tile) return;
+
+    const existing = c.querySelector(".tile");
+    if (existing) tileBank.appendChild(existing);
+
+    c.appendChild(tile);
+
+    if (autoCheckEl.checked) applyCheckingToCell(c);
+    checkCelebration();
+  });
+
+  return c;
+}
+EXPECTED.forEach(sym => board.appendChild(createCell(sym)));
+
+/* ---------- TILES + TOUCH ---------- */
+function shuffle(a){
+  for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
+
+function makeTile(symbol){
+  const t = document.createElement("div");
+  t.className = "tile";
+  t.textContent = symbol;
+  t.dataset.symbol = symbol;
+  t.id = "t_" + Math.random().toString(36).slice(2);
+  t.draggable = true;
+
+  // Desktop drag
+  t.addEventListener("dragstart", e => {
+    e.dataTransfer.setData("text/id", t.id);
+    t.classList.add("dragging");
+  });
+  t.addEventListener("dragend", () => t.classList.remove("dragging"));
+
+  // Touch fallback
+  let offsetX=0, offsetY=0;
+  t.addEventListener("touchstart", e => {
+    const touch=e.targetTouches[0];
+    offsetX = touch.clientX - t.getBoundingClientRect().left;
+    offsetY = touch.clientY - t.getBoundingClientRect().top;
+    t.classList.add("dragging");
+  }, {passive:true});
+  t.addEventListener("touchmove", e => {
+    e.preventDefault();
+    const touch=e.targetTouches[0];
+    t.style.position="fixed";
+    t.style.left=(touch.clientX-offsetX)+"px";
+    t.style.top =(touch.clientY-offsetY)+"px";
+  }, {passive:false});
+  t.addEventListener("touchend", e => {
+    t.classList.remove("dragging");
+    t.style.position=""; t.style.left=""; t.style.top="";
+    const touch=e.changedTouches[0];
+    const dropTarget=document.elementFromPoint(touch.clientX,touch.clientY);
+    if (!dropTarget) return;
+    if (dropTarget.classList.contains("cell")){
+      const existing=dropTarget.querySelector(".tile");
+      if (existing) tileBank.appendChild(existing);
+      dropTarget.appendChild(t);
+      if (autoCheckEl.checked) applyCheckingToCell(dropTarget);
+      checkCelebration();
+    } else {
+      tileBank.appendChild(t);
+    }
+  });
+
+  return t;
+}
+
+function loadTilesShuffled(){
+  tileBank.innerHTML = "";
+  const mono = shuffle([...MONO]);
+  const dip  = shuffle([...DIP]);
+  const cons = shuffle([...CONS]);
+  [...mono, ...dip, ...cons].forEach(s => tileBank.appendChild(makeTile(s)));
+}
+loadTilesShuffled();
+
+/* Return tile to tray */
+tileBank.addEventListener("dragover", e => e.preventDefault());
+tileBank.addEventListener("drop", e => {
+  e.preventDefault();
+  const id = e.dataTransfer.getData("text/id");
+  const tile = document.getElementById(id);
+  if (!tile) return;
+  const oldCell = tile.parentElement;
+  tileBank.appendChild(tile);
+  if (oldCell.classList.contains("cell")) clearCheckingFromCell(oldCell);
+  checkCelebration();
+});
+
+/* ---------- AUTO CHECK ---------- */
+const autoCheckEl = document.getElementById("autoCheck");
+function clearCheckingFromCell(c){ c.classList.remove("correct","incorrect"); }
+function applyCheckingToCell(c){
+  clearCheckingFromCell(c);
+  const expected = c.dataset.expected;
+  const tile = c.querySelector(".tile");
+  if (!tile || expected === "") return;
+  if (tile.dataset.symbol === expected) c.classList.add("correct");
+  else c.classList.add("incorrect");
+}
+function applyCheckingToAll(){ document.querySelectorAll(".cell").forEach(applyCheckingToCell); }
+autoCheckEl.addEventListener("change", e => {
+  if (e.target.checked) applyCheckingToAll();
+  else document.querySelectorAll(".cell").forEach(clearCheckingFromCell);
+  checkCelebration();
+});
+
+/* ---------- COLOUR + VOICING (inline, voicing disabled until colour ON) ---------- */
+const colourToggle  = document.getElementById("colourLocations");
+const voicingToggle = document.getElementById("shadeVoicing");
+const voicingLabel  = document.getElementById("voicingLabel");
+
+colourToggle.addEventListener("change", e => {
+  const on = e.target.checked;
+
+  // enable/disable voicing control
+  voicingLabel.style.opacity       = on ? "1" : "0.5";
+  voicingLabel.style.pointerEvents = on ? "auto" : "none";
+
+  // turning off categories disables voicing
+  if (!on) {
+    voicingToggle.checked = false;
+    applyVoicingShadingReset();
+  }
+
+  // apply category colours
+  document.querySelectorAll(".cell").forEach((cell,i)=>{
+    const sym = EXPECTED[i];
+    cell.style.background = "";
+    if (on) {
+      if (MONO.includes(sym)) cell.style.background = "var(--mono-colour)";
+      if (DIP.includes(sym))  cell.style.background = "var(--dip-colour)";
+      if (CONS.includes(sym)) cell.style.background = "var(--cons-colour)";
+    }
+  });
+
+  // layer voicing if both are on
+  if (on && voicingToggle.checked) applyVoicingShading();
+
+  checkCelebration();
+});
+
+voicingToggle.addEventListener("change", e => {
+  if (!colourToggle.checked){
+    voicingToggle.checked = false;
+    return;
+  }
+  applyVoicingShadingReset();
+  if (e.target.checked) applyVoicingShading();
+  checkCelebration();
+});
+
+function applyVoicingShading(){
+  document.querySelectorAll(".cell").forEach((cell,i)=>{
+    const sym = EXPECTED[i];
+    if (!CONS.includes(sym)) return;
+    if (UNVOICED_OBS.includes(sym)) cell.style.background = "var(--unvoiced-blue)";
+    if (VOICED_OBS.includes(sym))   cell.style.background = "var(--voiced-blue)";
+  });
+}
+function applyVoicingShadingReset(){
+  document.querySelectorAll(".cell").forEach(c => c.style.background = "");
+  if (colourToggle.checked) colourToggle.dispatchEvent(new Event("change"));
+}
+
+/* ---------- MODAL CELEBRATION ---------- */
+const overlay = document.getElementById("congrats-overlay");
+document.getElementById("closeCongrats").addEventListener("click", () => {
+  overlay.style.display = "none";
+});
+function checkCelebration() {
+  const placed  = document.querySelectorAll("#board .tile").length;
+  const correct = document.querySelectorAll("#board .correct").length;
+  const total   = TILE_SET.length;
+
+  const overlay = document.getElementById("congrats-overlay");
+
+  if (placed === total && correct === total) {
+    overlay.style.display = "flex";   // show the modal
+    overlay.classList.add("show");    // start animations
+  } else {
+    overlay.classList.remove("show"); // fade out
+    overlay.style.display = "none";
+  }
+}
+document.getElementById("closeCongrats").addEventListener("click", () => {
+  const overlay = document.getElementById("congrats-overlay");
+  overlay.classList.remove("show");
+  overlay.style.display = "none";
+});
+
+/* ---------- RESET ---------- */
+document.getElementById("resetBtn").addEventListener("click", ()=>{
+  document.querySelectorAll(".cell .tile").forEach(t => tileBank.appendChild(t));
+  document.querySelectorAll(".cell").forEach(clearCheckingFromCell);
+  loadTilesShuffled();
+  colourToggle.dispatchEvent(new Event("change"));
+  autoCheckEl.dispatchEvent(new Event("change"));
+  overlay.style.display = "none";
+});
+</script>
+
+</body>
+</html>

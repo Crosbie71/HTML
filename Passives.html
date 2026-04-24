@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A-Level Voice Workshop (4:3 Optimized)</title>
+    <style>
+        :root {
+            --subject-color: #3498db;
+            --verb-color: #e74c3c;
+            --object-color: #2ecc71;
+            --bg-color: #f4f7f6;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        /* Responsive Container */
+        .sentence-container {
+            display: flex;
+            gap: 1.5vw;
+            align-items: center;
+            padding: 40px 20px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            width: 95%;
+            max-width: 1300px; /* Limits size on massive ultrawide screens */
+            min-height: 250px;
+            justify-content: center;
+        }
+
+        /* Flexible Slots */
+        .slot-group { 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            flex: 1; /* Allows columns to shrink/grow equally */
+            min-width: 0; 
+        }
+        
+        /* Larger Verb Box for 4:3 */
+        .verb-group { flex: 1.8; } 
+
+        .label { 
+            font-size: 0.8rem; 
+            text-transform: uppercase; 
+            color: #95a5a6; 
+            margin-bottom: 12px; 
+            font-weight: bold; 
+            text-align: center;
+            min-height: 1rem;
+        }
+        
+        .drop-zone { 
+            border: 3px dashed #ddd; 
+            border-radius: 12px; 
+            width: 100%; 
+            height: 120px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            background: #fdfdfd;
+        }
+
+        .word-box { 
+            padding: 10px; 
+            border-radius: 10px; 
+            color: white; 
+            font-size: clamp(1.2rem, 2.2vw, 2rem); /* Dynamic text scaling */
+            font-weight: bold; 
+            cursor: grab; 
+            text-align: center; 
+            width: 90%; 
+            transition: opacity 0.3s ease-in-out; 
+        }
+        .subject { background-color: var(--subject-color); }
+        .object { background-color: var(--object-color); }
+
+        /* Verb Styles */
+        .verb-container { perspective: 1000px; width: 100%; height: 120px; }
+        .verb-flipper { position: relative; width: 100%; height: 100%; transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); transform-style: preserve-3d; }
+        .verb-container.is-flipped .verb-flipper { transform: rotateY(-180deg); }
+        .verb-face { 
+            position: absolute; 
+            width: 100%; 
+            height: 100%; 
+            backface-visibility: hidden; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            border-radius: 10px; 
+            background-color: var(--verb-color); 
+            color: white; 
+            font-size: clamp(1.1rem, 2vw, 1.8rem); 
+            font-weight: bold; 
+            padding: 0 10px; 
+            box-sizing: border-box; 
+            text-align: center;
+        }
+        .verb-back { transform: rotateY(-180deg); }
+
+        /* Agent Phrase */
+        .by-phrase { 
+            display: flex; 
+            align-items: center; 
+            opacity: 0; 
+            width: auto;
+            max-width: 25%;
+            transition: opacity 0.4s; 
+            font-size: clamp(1.2rem, 2vw, 2rem); 
+            color: #7f8c8d; 
+            font-weight: bold; 
+        }
+        .by-phrase.visible { opacity: 1; }
+        .by-phrase.hidden-agent { opacity: 0 !important; }
+
+        /* Controls Area */
+        .controls { margin-top: 30px; display: flex; flex-direction: column; align-items: center; gap: 15px; width: 100%; }
+        .tense-display { color: #7f8c8d; font-style: italic; font-size: 1.2rem; min-height: 1.5rem; text-align: center; }
+        .btn-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+        
+        button { 
+            padding: 12px 18px; 
+            font-size: 1rem; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            background-color: #2c3e50; 
+            color: white; 
+            transition: 0.2s;
+        }
+        button:hover { background: #34495e; }
+        .btn-delete { background-color: #c0392b; }
+    </style>
+</head>
+<body>
+
+    <div class="sentence-container">
+        <div class="slot-group">
+            <div class="label" id="l-subj">Subject (Agent)</div>
+            <div id="slot-left" class="drop-zone" ondrop="drop(event)" ondragover="allowDrop(event)">
+                <div id="box-agent" class="word-box subject" draggable="true" ondragstart="drag(event)">Shakespeare</div>
+            </div>
+        </div>
+
+        <div class="slot-group verb-group">
+            <div class="label">Verb Phrase</div>
+            <div id="verb-scene" class="verb-container">
+                <div class="verb-flipper">
+                    <div class="verb-face verb-front" id="v-active">wrote</div>
+                    <div class="verb-face verb-back" id="v-passive">were written</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="slot-group">
+            <div class="label" id="l-obj">Object (Recipient)</div>
+            <div id="slot-right" class="drop-zone" ondrop="drop(event)" ondragover="allowDrop(event)">
+                <div id="box-recipient" class="word-box object" draggable="true" ondragstart="drag(event)">the plays</div>
+            </div>
+        </div>
+
+        <div id="by-section" class="by-phrase">
+            <span style="margin: 0 10px;">by</span>
+            <div id="box-agent-copy" class="word-box subject" style="opacity: 0.7; transform: scale(0.85); width: auto; flex: 1;">Shakespeare</div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div id="tense-info" class="tense-display">Tense: Past Simple (Irregular)</div>
+        <div class="btn-row">
+            <button onclick="reset()">Reset</button>
+            <button class="btn-delete" id="del-btn" onclick="toggleAgent()" style="visibility: hidden;">Delete Agent</button>
+            <button onclick="next()" style="background: #e67e22;">Next Example</button>
+            <button id="set-toggle" onclick="switchSet()" style="background: #8e44ad;">Mode: Balanced</button>
+        </div>
+    </div>
+
+    <script>
+        const balancedSet = [
+            { t: "Past Simple (Irregular)", s: "Shakespeare", vA: "wrote", vP: "were written", o: "the plays" },
+            { t: "Present Progressive (Irregular)", s: "A thief", vA: "is stealing", vP: "is being stolen", o: "the jewelry" },
+            { t: "Past Simple (Irregular)", s: "Witnesses", vA: "saw", vP: "was seen", o: "the accident" },
+            { t: "Present Simple (Irregular)", s: "Everyone", vA: "knows", vP: "is known", o: "the truth" },
+            { t: "Past Simple", s: "Scientists", vA: "discovered", vP: "was discovered", o: "a planet" },
+            { t: "Present Progressive", s: "The council", vA: "is rejecting", vP: "is being rejected", o: "the proposal" },
+            { t: "Past Simple", s: "The voters", vA: "rejected", vP: "was rejected", o: "the bill" }
+        ];
+
+        const advancedSet = [
+            { t: "Present Progressive", s: "The police", vA: "are watching", vP: "are being watched", o: "the suspects" },
+            { t: "Present Perfect", s: "The chef", vA: "has prepared", vP: "has been prepared", o: "the meal" },
+            { t: "Modal (Requirement)", s: "Everyone", vA: "must follow", vP: "must be followed", o: "the rules" },
+            { t: "Future (Will)", s: "The company", vA: "will launch", vP: "will be launched", o: "the app" },
+            { t: "Past Perfect", s: "The storm", vA: "had destroyed", vP: "had been destroyed", o: "the bridge" },
+            { t: "Modal Perfect (Possibility)", s: "A witness", vA: "might have seen", vP: "might have been seen", o: "the thief" },
+            { t: "Present Simple", s: "The sun", vA: "powers", vP: "is powered", o: "the station" }
+        ];
+
+        let currentExamples = balancedSet;
+        let currentIdx = 0;
+        let isPassive = false;
+
+        function allowDrop(ev) { ev.preventDefault(); }
+        function drag(ev) { ev.dataTransfer.setData("text", ev.target.id); }
+
+        function drop(ev) {
+            ev.preventDefault();
+            const data = ev.dataTransfer.getData("text");
+            if (data === "box-recipient" && ev.currentTarget.id === "slot-left") transform();
+        }
+
+        function transform() {
+            if (isPassive) return;
+            document.getElementById("slot-left").appendChild(document.getElementById("box-recipient"));
+            document.getElementById("box-agent").style.display = "none";
+            document.getElementById("verb-scene").classList.add("is-flipped");
+            document.getElementById("by-section").classList.add("visible");
+            document.getElementById("l-subj").innerText = "Subject (Recipient)";
+            document.getElementById("l-obj").innerText = "";
+            document.getElementById("del-btn").style.visibility = "visible";
+            isPassive = true;
+        }
+
+        function reset() {
+            isPassive = false;
+            document.getElementById("slot-left").appendChild(document.getElementById("box-agent"));
+            document.getElementById("slot-right").appendChild(document.getElementById("box-recipient"));
+            document.getElementById("box-agent").style.display = "block";
+            document.getElementById("verb-scene").classList.remove("is-flipped");
+            document.getElementById("by-section").classList.remove("visible");
+            document.getElementById("by-section").classList.remove("hidden-agent");
+            document.getElementById("l-subj").innerText = "Subject (Agent)";
+            document.getElementById("l-obj").innerText = "Object (Recipient)";
+            document.getElementById("del-btn").style.visibility = "hidden";
+            document.getElementById("del-btn").innerText = "Delete Agent";
+        }
+
+        function switchSet() {
+            currentExamples = (currentExamples === balancedSet) ? advancedSet : balancedSet;
+            document.getElementById("set-toggle").innerText = (currentExamples === balancedSet) ? "Mode: Balanced" : "Mode: Advanced";
+            currentIdx = 0;
+            next();
+        }
+
+        function toggleAgent() {
+            const section = document.getElementById("by-section");
+            section.classList.toggle("hidden-agent");
+            document.getElementById("del-btn").innerText = section.classList.contains("hidden-agent") ? "Restore Agent" : "Delete Agent";
+        }
+
+        function next() {
+            const textElements = document.querySelectorAll('.word-box, .verb-face, .tense-display');
+            textElements.forEach(el => el.style.opacity = '0');
+
+            reset();
+            
+            setTimeout(() => {
+                const ex = currentExamples[currentIdx];
+                document.getElementById("tense-info").innerText = "Tense: " + ex.t;
+                document.getElementById("box-agent").innerText = ex.s;
+                document.getElementById("box-agent-copy").innerText = ex.s;
+                document.getElementById("v-active").innerText = ex.vA;
+                document.getElementById("v-passive").innerText = ex.vP;
+                document.getElementById("box-recipient").innerText = ex.o;
+                
+                textElements.forEach(el => el.style.opacity = '1');
+                currentIdx = (currentIdx + 1) % currentExamples.length;
+            }, 500); 
+        }
+    </script>
+</body>
+</html>

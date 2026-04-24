@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Jane Austen – Task Two (Modern English)</title>
+<style>
+    body {
+        font-family: Arial, Helvetica, sans-serif;
+        background: #f7f7f7;
+        margin: 0;
+        padding: 40px;
+        line-height: 1.6;
+    }
+
+    h1 {
+        text-align: center;
+    }
+
+    .item {
+        background: #ffffff;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        margin: 12px auto;
+        padding: 16px 20px;
+        max-width: 800px;
+        cursor: pointer;
+        transition: background 0.3s;
+    }
+
+    .item:hover {
+        background: #f0f6ff;
+    }
+
+    .original {
+        font-weight: bold;
+    }
+
+    .modern {
+        margin-top: 10px;
+        color: #003366;
+        display: none;
+    }
+
+    .hint {
+        text-align: center;
+        font-size: 0.9em;
+        color: #666;
+        margin-bottom: 20px;
+    }
+</style>
+
+<script>
+    function toggleModern(id) {
+        const element = document.getElementById(id);
+        element.style.display = element.style.display === "none" ? "block" : "none";
+    }
+</script>
+</head>
+
+<body>
+
+<h1>Jane Austen: Task Two (1)</h1>
+<p class="hint">Click each sentence to reveal the modern English version.</p>
+
+<div class="item" onclick="toggleModern('m1')">
+    <div class="original">1. I am so glad we <em>are got</em> acquainted.</div>
+    <div class="modern" id="m1">I am so glad we <strong>have got / have become</strong> acquainted.</div>
+</div>
+
+<div class="item" onclick="toggleModern('m2')">
+    <div class="original">2. So, you <em>are come</em> at last!</div>
+    <div class="modern" id="m2">So, you <strong>have come</strong> at last!</div>
+</div>
+
+<div class="item" onclick="toggleModern('m3')">
+    <div class="original">3. What <em>say you</em> to the day?</div>
+    <div class="modern" id="m3">What <strong>do you say / think</strong> of the day?</div>
+</div>
+
+<div class="item" onclick="toggleModern('m4')">
+    <div class="original">4. She <em>doubted not</em> …</div>
+    <div class="modern" id="m4">She <strong>did not doubt</strong> …</div>
+</div>
+
+<div class="item" onclick="toggleModern('m5')">
+    <div class="original">5. Fanny <em>shrunk</em> back …</div>
+    <div class="modern" id="m5">Fanny <strong>shrank</strong> back …</div>
+</div>
+
+<div class="item" onclick="toggleModern('m6')">
+    <div class="original">6. And much was <em>ate</em> …</div>
+    <div class="modern" id="m6">And much was <strong>eaten</strong> …</div>
+</div>
+
+<div class="item" onclick="toggleModern('m7')">
+    <div class="original">7. It is <em>a nothing</em> of a part …</div>
+    <div class="modern" id="m7">It is <strong>nothing</strong> of a part …</div>
+</div>
+
+<div class="item" onclick="toggleModern('m8')">
+    <div class="original">8. To be taken <em>into the account</em> …</div>
+    <div class="modern" id="m8">To be taken <strong>into account</strong> …</div>
+</div>
+
+<div class="item" onclick="toggleModern('m9')">
+    <div class="original">9. <em>Will not it</em> be a good plan?</div>
+    <div class="modern" id="m9"><strong>Won’t it</strong> be a good plan?</div>
+</div>
+
+<div class="item" onclick="toggleModern('m10')">
+    <div class="original">10. It would quite shock you … <em>would not it</em>?</div>
+    <div class="modern" id="m10">It would quite shock you … <strong>wouldn’t it</strong>?</div>
+</div>
+
+<div class="item" onclick="toggleModern('m11')">
+    <div class="original">11. He told me <em>in</em> our journey …</div>
+    <div class="modern" id="m11">He told me <strong>on</strong> our journey …</div>
+</div>
+
+<div class="item" onclick="toggleModern('m12')">
+    <div class="original">12. She was small <em>of</em> her age.</div>
+    <div class="modern" id="m12">She was small <strong>for</strong> her age.</div>
+</div>
+
+<div class="item" onclick="toggleModern('m13')">
+    <div class="original">13. I stood for a minute, feeling <em>dreadfully</em> …</div>
+    <div class="modern" id="m13">I stood for a minute, feeling <strong>dreadful / very bad</strong> …</div>
+</div>
+
+<div class="item" onclick="toggleModern('m14')">
+    <div class="original">14. It is really very <em>well</em> for a novel.</div>
+    <div class="modern" id="m14">It is really very <strong>good</strong> for a novel.</div>
+</div>
+
+<div class="item" onclick="toggleModern('m15')">
+    <div class="original">15. The <em>properest</em> manner …</div>
+    <div class="modern" id="m15">The <strong>most proper</strong> manner …</div>
+</div>
+
+<div class="item" onclick="toggleModern('m16')">
+    <div class="original">16. The <em>richest</em> of the two …</div>
+    <div class="modern" id="m16">The <strong>richer</strong> of the two …</div>
+</div>
+
+</body>
+</html>

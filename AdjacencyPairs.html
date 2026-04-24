@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Adjacency Pairs — Match & Stagger (Fixed Overlap, Scrambled Start)</title>
+<style>
+  :root{
+    --gap: 12px;
+    --row-h: 76px;            /* row height for classroom visibility */
+    --fs-base: 20px;          /* base font-size; increase if needed */
+    --left-bg: #f6f7f9;
+    --tile-bg: #ffffff;
+    --ok-bg: #e8f7ec;
+    --ok-border: #30a46c;
+    --bad-bg: #fde8ea;
+    --bad-border: #d84a5c;
+    --ink: #14171a;
+    --muted: #5b6770;
+  }
+  html,body { height:100%; }
+  body{
+    margin:0;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji", sans-serif;
+    color: var(--ink);
+    background: #fff;
+    font-size: var(--fs-base);
+    line-height: 1.25;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  header{
+    padding: 12px clamp(12px, 3vw, 24px);
+    border-bottom: 1px solid #e5e7eb;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 12px;
+  }
+  h1{
+    margin:0;
+    font-size: clamp(20px, 2.3vw, 28px);
+    font-weight: 700;
+    letter-spacing: .2px;
+  }
+  .controls{
+    display:flex;
+    gap:10px;
+    flex-wrap: wrap;
+  }
+  button{
+    appearance: none;
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    color: #0f172a;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    transition: transform .05s ease, background .15s ease, border-color .15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  button:hover{ background: #eef2ff; border-color:#94a3b8; }
+  button:active{ transform: translateY(1px); }
+  button#btn-stagger .icon{ display:inline-block; transition: transform .3s ease; }
+  button#btn-stagger.spin .icon{ transform: rotate(180deg); }
+
+  .wrap{
+    padding: clamp(12px, 2.5vw, 20px);
+    display: grid;
+    justify-content: center;
+  }
+
+  /* Board sized for a 3:4 display (e.g., 1024×768) */
+  .board{
+    width: min(1100px, 94vw);
+    margin-inline: auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--gap);
+  }
+
+  .col{
+    display: grid;
+    gap: var(--gap);
+    grid-auto-rows: var(--row-h);
+  }
+
+  /* Left column cells (fixed first parts) */
+  .first-cell{
+    background: var(--left-bg);
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 10px 12px;
+    display: grid;
+    /* FIXED: widened badge column to remove overlap */
+    grid-template-columns: 150px 1fr;
+    align-items: center;
+  }
+  .badge{
+    font-size: 12px;
+    font-weight: 800;
+    color: #334155;
+    background: #e2e8f0;
+    border-radius: 999px;
+    padding: 6px 10px;
+    text-transform: uppercase;
+    letter-spacing: .7px;
+    justify-self: start;
+  }
+  .utterance{
+    font-size: clamp(16px, 2vw, 20px);
+    font-weight: 650;
+    /* FIXED: add separation from badge */
+    margin-left: 10px;
+  }
+  .index{
+    font-weight: 700;
+    color: #475569;
+    margin-right: 10px;
+  }
+
+  /* Right column slips (draggable second parts) */
+  #slips{
+    position: relative;
+  }
+  .slip{
+    background: var(--tile-bg);
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 10px 12px;
+    display: grid;
+    /* FIXED: widened badge column to remove overlap */
+    grid-template-columns: 150px 1fr;
+    align-items: center;
+    box-shadow: 0 1px 0 rgba(0,0,0,.05);
+    cursor: grab;
+    user-select: none;
+  }
+  .slip .utterance{ margin-left: 10px; } /* FIXED: separation inside slip */
+  .slip:active{ cursor: grabbing; }
+  .slip .badge{ background:#e9d5ff; color:#4c1d95; } /* visually distinct from left */
+  .ghost{ opacity: .6; }
+
+  /* Drag & drop positioning helper */
+  .dragging{ opacity: .85; transform: scale(1.01); }
+
+  /* Checking feedback */
+  .correctL, .correctR{
+    background: var(--ok-bg) !important;
+    border-color: var(--ok-border) !important;
+    box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--ok-border) 35%, transparent);
+  }
+  .incorrectR{
+    background: var(--bad-bg) !important;
+    border-color: var(--bad-border) !important;
+  }
+
+  .status{
+    margin-top: 8px;
+    text-align: center;
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  /* Stagger slide animation (first -> last) */
+  #slips.staggering{
+    transition: transform 260ms ease;
+    will-change: transform;
+  }
+
+  @media (max-width: 900px){
+    :root{ --row-h: 84px; } /* slightly taller rows for small screens */
+    .board{ grid-template-columns: 1fr; }
+    .status{ margin-bottom: 10px; }
+  }
+
+  /* Visually hidden utility for screen readers */
+  .sr-only{
+    position: absolute !important;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Adjacency Pairs — Match &amp; Stagger</h1>
+  <div class="controls">
+    <button id="btn-reset" title="Restore correct order (1:1 matches)"><span>🔁</span><span>Reset</span></button>
+    <button id="btn-scramble" title="Shuffle the slips randomly"><span>🎲</span><span>Scramble</span></button>
+    <button id="btn-stagger" title="Rotate first slip to the bottom (with animation)"><span class="icon">↻</span><span>Stagger</span></button>
+    <button id="btn-check" title="Highlight matches green"><span>✅</span><span>Check Answers</span></button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="board" id="board">
+    <div class="col" id="leftCol" aria-label="First parts of adjacency pairs"></div>
+    <div class="col" id="slips" aria-label="Draggable second parts of adjacency pairs"></div>
+  </div>
+  <div id="status" class="status" aria-live="polite">Ready.</div>
+  <div class="sr-only" id="sr-status" aria-live="polite"></div>
+</div>
+
+<script>
+/*
+  Data loaded from the uploaded document "Adjacency pairs for mismatch.docx".
+  Source: user-provided file.  (reference id: turn1search1)
+*/
+const pairs = [
+  { id: 1,  aType: "Greeting",     a: "Hello!",                                    bType: "Greeting",       b: "Hi!" },
+  { id: 2,  aType: "Check",        a: "What’s your name again?",                   bType: "Clarification",  b: "John Doe." },
+  { id: 3,  aType: "Question",     a: "So why were you late today?",               bType: "Answer",         b: "I’ve already told you!" },
+  { id: 4,  aType: "Apology",      a: "I’m really really sorry.",                  bType: "Acceptance",     b: "Please – don’t mention it." },
+  { id: 5,  aType: "Compliment",   a: "That shirt really suits you!",              bType: "Thanks",         b: "Thank you." },
+  { id: 6,  aType: "Opinion",      a: "Beethoven’s 5th is a masterpiece.",         bType: "Agreement",      b: "Yes, it’s absolutely perfect." },
+  { id: 7,  aType: "Accusation",   a: "It’s all your fault we were late!",         bType: "Denial",         b: "No it isn’t!" },
+  { id: 8,  aType: "Offer",        a: "Can I help you?",                           bType: "Acceptance",     b: "Oo, yes please." },
+  { id: 9,  aType: "Assertion",    a: "I’d like to do a linguistics degree here.", bType: "Acknowledgement", b: "Uh-huh." },
+  { id:10,  aType: "Request",      a: "Can you lend me £5?",                       bType: "Acceptance",     b: "Sure, no problem." },
+  { id:11,  aType: "Instruction",  a: "Say the Password!",                         bType: "Compliance",     b: "Open Sesame." }
+];
+
+const leftCol   = document.getElementById('leftCol');
+const slips     = document.getElementById('slips');
+const statusEl  = document.getElementById('status');
+const srStatus  = document.getElementById('sr-status');
+
+const btnReset   = document.getElementById('btn-reset');
+const btnScramble= document.getElementById('btn-scramble');
+const btnStagger = document.getElementById('btn-stagger');
+const btnCheck   = document.getElementById('btn-check');
+
+let checked = false;  // when true, we re-check after every change
+
+function buildUI(){
+  // Left column (fixed)
+  leftCol.innerHTML = '';
+  pairs.forEach((p, i) => {
+    const cell = document.createElement('div');
+    cell.className = 'first-cell';
+    cell.dataset.row = i;  // zero-based row index
+    cell.innerHTML = `
+      <div class="badge"><span class="index">#${p.id}</span> ${p.aType}</div>
+      <div class="utterance">${p.a}</div>
+    `;
+    leftCol.appendChild(cell);
+  });
+
+  // Right column (start in CORRECT order, then scramble to ensure no matches)
+  slips.innerHTML = '';
+  pairs.forEach((p) => {
+    slips.appendChild(makeSlip(p));
+  });
+
+  // SCRAMBLE on load so there are no initial matches
+  scrambleSlipsEnsureNoMatches();
+
+  setStatus('Ready. Drag the slips, or click Scramble.');
+  checked = false; // reset checking state
+}
+function makeSlip(p){
+  const el = document.createElement('div');
+  el.className = 'slip';
+  el.draggable = true;
+  el.dataset.id = p.id;       // pair id
+  el.setAttribute('aria-grabbed', 'false');
+  el.innerHTML = `
+    <div class="badge">${p.bType}</div>
+    <div class="utterance">${p.b}</div>
+  `;
+  // Drag events
+  el.addEventListener('dragstart', onDragStart);
+  el.addEventListener('dragend', onDragEnd);
+  return el;
+}
+
+/* ---------------- Drag & Drop reordering (pure HTML5) ---------------- */
+let draggingEl = null;
+
+function onDragStart(e){
+  draggingEl = e.currentTarget;
+  draggingEl.classList.add('dragging');
+  draggingEl.setAttribute('aria-grabbed','true');
+  // for Firefox
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', draggingEl.dataset.id);
+}
+function onDragEnd(e){
+  if(draggingEl){
+    draggingEl.classList.remove('dragging');
+    draggingEl.setAttribute('aria-grabbed','false');
+    draggingEl = null;
+  }
+  if(checked) checkAnswers();
+}
+
+slips.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  const after = getDragAfterElement(slips, e.clientY);
+  const dragging = document.querySelector('.dragging');
+  if(!dragging) return;
+  if(after == null){
+    slips.appendChild(dragging);
+  }else{
+    slips.insertBefore(dragging, after);
+  }
+});
+
+function getDragAfterElement(container, y){
+  const els = [...container.querySelectorAll('.slip:not(.dragging)')];
+  return els.reduce((closest, child) => {
+    const box = child.getBoundingClientRect();
+    const offset = y - box.top - box.height/2;
+    if(offset < 0 && offset > closest.offset){
+      return { offset, element: child };
+    }else{
+      return closest;
+    }
+  }, { offset: Number.NEGATIVE_INFINITY, element: null }).element;
+}
+
+/* ---------------- Actions: Reset, Scramble, Stagger, Check ---------------- */
+btnReset.addEventListener('click', () => {
+  // restore correct order then scramble (so start clean but mismatched)
+  slips.innerHTML = '';
+  pairs.forEach(p => slips.appendChild(makeSlip(p)));
+  clearHighlights();
+  scrambleSlipsEnsureNoMatches();
+  if(checked) checkAnswers();
+  setStatus('Reset and scrambled.');
+});
+
+btnScramble.addEventListener('click', () => {
+  scrambleSlipsEnsureNoMatches();
+  if(checked) checkAnswers();
+  setStatus('Slips scrambled.');
+});
+
+btnStagger.addEventListener('click', () => {
+  // Animate upwards by one row, then move first -> last
+  if(slips.children.length <= 1) return;
+
+  const gap = parseFloat(getComputedStyle(slips).gap) || 0;
+  const first = slips.firstElementChild;
+  const rect = first.getBoundingClientRect();
+  const h = rect.height + gap;
+
+  // visual slide
+  slips.classList.add('staggering');
+  slips.style.transform = `translateY(-${h}px)`;
+
+  // spin the icon slightly
+  btnStagger.classList.add('spin');
+
+  function onEnd(){
+    slips.classList.remove('staggering');
+    slips.style.transition = '';
+    slips.style.transform = '';
+    slips.removeEventListener('transitionend', onEnd);
+    // move first -> last
+    slips.appendChild(first);
+    if(checked) checkAnswers();
+    btnStagger.classList.remove('spin');
+  }
+  // set transition after a tick to ensure it animates
+  requestAnimationFrame(() => {
+    slips.style.transition = 'transform 260ms ease';
+    // ensure the event fires even if transition is interrupted
+    slips.addEventListener('transitionend', onEnd);
+  });
+});
+
+btnCheck.addEventListener('click', () => {
+  checked = true;
+  checkAnswers(true);
+  setStatus('Checked. Correct rows highlighted in green.');
+});
+
+/* ---------------- Checking & feedback ---------------- */
+function clearHighlights(){
+  [...leftCol.children].forEach(n => n.classList.remove('correctL'));
+  [...slips.children].forEach(n => n.classList.remove('correctR','incorrectR'));
+}
+
+function checkAnswers(announce=false){
+  clearHighlights();
+  const right = [...slips.children];
+  let correct = 0;
+  right.forEach((slipEl, idx) => {
+    const expectedId = pairs[idx].id.toString();  // row idx -> expected pair id
+    const isMatch = slipEl.dataset.id === expectedId;
+    if(isMatch){
+      leftCol.children[idx].classList.add('correctL');
+      slipEl.classList.add('correctR');
+      correct++;
+    }else{
+      slipEl.classList.add('incorrectR');
+    }
+  });
+  const msg = `${correct} / ${pairs.length} correct`;
+  statusEl.textContent = msg;
+  if(announce) srStatus.textContent = msg;
+}
+
+/* ---------------- Helpers ---------------- */
+function setStatus(text){ statusEl.textContent = text; }
+
+/* Fisher–Yates + guarantee no row starts matched */
+function scrambleSlipsEnsureNoMatches(){
+  const items = [...slips.children];
+  // Shuffle
+  for(let i = items.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [items[i], items[j]] = [items[j], items[i]];
+  }
+  // If any item happens to land in its matching row, rotate once to break matches
+  // Build a new array that is a rotation until no immediate matches
+  let attempts = 0;
+  while(items.some((el, idx) => el.dataset.id === pairs[idx].id.toString()) && attempts < items.length){
+    items.push(items.shift()); // rotate by 1
+    attempts++;
+  }
+  slips.innerHTML = '';
+  items.forEach(n => slips.appendChild(n));
+}
+
+/* Build initial interface */
+buildUI();
+</script>
+</body>
+</html>

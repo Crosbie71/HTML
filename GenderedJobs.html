@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Title Flashcards</title>
+    <style>
+        :root {
+            --primary-blue: #2563eb;
+            --bg-gray: #f8fafc;
+            --text-dark: #1e293b;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-gray);
+            color: var(--text-dark);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .container {
+            text-align: center;
+            width: 90%;
+            max-width: 800px;
+        }
+
+        #title-display {
+            font-size: 5rem;
+            font-weight: bold;
+            margin-bottom: 2rem;
+            min-height: 150px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
+            padding: 2rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 2rem;
+        }
+
+        button {
+            padding: 1rem 2rem;
+            font-size: 1.2rem;
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            transition: all 0.2s;
+            background: var(--primary-blue);
+            color: white;
+        }
+
+        button:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            background: #cbd5e1;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .progress-container {
+            width: 100%;
+            background-color: #e2e8f0;
+            border-radius: 10px;
+            margin-top: 3rem;
+            height: 12px;
+            overflow: hidden;
+        }
+
+        #progress-bar {
+            height: 100%;
+            width: 0%;
+            background-color: var(--primary-blue);
+            transition: width 0.3s ease;
+        }
+
+        .counter {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: #64748b;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="title-display">Ready?</div>
+    
+    <div class="controls">
+        <button id="prevBtn" onclick="prevTitle()" disabled>Back</button>
+        <button id="nextBtn" onclick="nextTitle()">Start / Next</button>
+        <button id="resetBtn" onclick="reset()">Reset</button>
+    </div>
+
+    <div class="progress-container">
+        <div id="progress-bar"></div>
+    </div>
+    <div class="counter" id="counter">0 / 0</div>
+</div>
+
+<script>
+    const jobs = [
+        "President", "Doctor", "Nurse", "Postman", "Police Officer", 
+        "Secretary", "Waiter", "Cleaner", "Carer", "Builder", 
+        "Manager", "Waitress", "Actor", "Professor", "Air Stewardess", 
+        "Magician", "IT Technician", "Midwife", "Stuntman", "Teacher", 
+        "Beautician", "Bullfighter", "Hairdresser", "Fashion Model", 
+        "Fashion Designer", "Chef", "Prostitute", "Sanitation Engineer", 
+        "Poet", "Nanny", "Farmer", "Firefighter", "Landlady", 
+        "Politician", "Lecturer", "Ballerina", "Headmaster", 
+        "Violinist", "Maid", "Guitarist", "Psychologist", "Cook"
+    ];
+
+    let shuffledJobs = [];
+    let currentIndex = -1;
+
+    function shuffle(array) {
+        let newArr = [...array];
+        for (let i = newArr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
+        }
+        return newArr;
+    }
+
+    function updateUI() {
+        const display = document.getElementById('title-display');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const progressBar = document.getElementById('progress-bar');
+        const counter = document.getElementById('counter');
+
+        if (currentIndex === -1) {
+            display.innerText = "Click Start";
+            prevBtn.disabled = true;
+            nextBtn.innerText = "Start";
+        } else {
+            display.innerText = shuffledJobs[currentIndex];
+            prevBtn.disabled = currentIndex === 0;
+            nextBtn.innerText = currentIndex === shuffledJobs.length - 1 ? "Finished" : "Next";
+            nextBtn.disabled = currentIndex === shuffledJobs.length - 1;
+        }
+
+        const progressPercent = ((currentIndex + 1) / shuffledJobs.length) * 100;
+        progressBar.style.width = (currentIndex === -1 ? 0 : progressPercent) + "%";
+        counter.innerText = `${currentIndex + 1} / ${shuffledJobs.length}`;
+    }
+
+    function nextTitle() {
+        if (shuffledJobs.length === 0) reset();
+        if (currentIndex < shuffledJobs.length - 1) {
+            currentIndex++;
+            updateUI();
+        }
+    }
+
+    function prevTitle() {
+        if (currentIndex > 0) {
+            currentIndex--;
+            updateUI();
+        }
+    }
+
+    function reset() {
+        shuffledJobs = shuffle(jobs);
+        currentIndex = -1;
+        updateUI();
+    }
+
+    // Initialize
+    reset();
+</script>
+
+</body>
+</html>

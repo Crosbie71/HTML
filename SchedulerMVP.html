@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mock Exam Rota Builder - V6 (Auto-Solver)</title>
+    <style>
+        :root {
+            --bg-color: #f0f4f8; --primary: #2c3e50; --secondary: #27ae60;
+            --manager: #8e44ad; --danger: #c0392b; --border: #bdc3c7; --magic: #f39c12;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color); color: var(--primary);
+            margin: 0; padding: 20px; display: flex; flex-direction: column;
+            height: 100vh; box-sizing: border-box;
+        }
+        header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid var(--border);
+        }
+        .controls button, .controls label {
+            background-color: var(--primary); color: white; border: none;
+            padding: 8px 12px; margin-left: 10px; border-radius: 5px; cursor: pointer; font-size: 14px;
+            transition: background 0.2s;
+        }
+        .controls button:hover, .controls label:hover { background-color: #34495e; }
+        .btn-magic { background-color: var(--magic) !important; color: #fff; font-weight: bold; }
+        .btn-magic:hover { background-color: #d68910 !important; }
+        .btn-danger { background-color: var(--danger) !important; }
+        .btn-danger:hover { background-color: #a93226 !important; }
+        #fileInput { display: none; }
+        
+        .container { display: flex; flex: 1; gap: 20px; overflow: hidden; }
+        
+        .grid-container {
+            flex: 3; display: flex; gap: 15px; overflow-x: auto; padding-bottom: 10px;
+        }
+        .day-column {
+            min-width: 300px; background: white; border: 1px solid var(--border);
+            border-radius: 6px; display: flex; flex-direction: column;
+            height: fit-content; max-height: 100%; overflow-y: auto;
+        }
+        .day-header {
+            text-align: center; font-weight: bold; padding: 12px; position: sticky; top: 0;
+            background-color: var(--primary); color: white; border-radius: 5px 5px 0 0; z-index: 10;
+        }
+        .session-block {
+            padding: 10px; border-bottom: 2px dashed var(--border); background: #fafafa;
+        }
+        .session-title {
+            font-weight: bold; color: var(--secondary); margin-bottom: 10px; font-size: 15px;
+        }
+        
+        .room-slot {
+            background: white; border: 2px solid #e0e0e0; border-radius: 6px;
+            padding: 8px; margin-bottom: 10px; min-height: 50px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: all 0.2s;
+        }
+        .room-slot.manager-slot { border-color: #d2b4de; background-color: #f5eef8; }
+        .room-slot.dragover { border-color: var(--secondary); background-color: #eafaf1; transform: scale(1.02); }
+        
+        .room-header {
+            display: flex; justify-content: space-between; border-bottom: 1px solid #eee;
+            padding-bottom: 4px; margin-bottom: 6px; gap: 10px;
+        }
+        .editable-field {
+            border-bottom: 1px dashed transparent; outline: none; transition: border-color 0.2s;
+            cursor: text; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .editable-field:hover { border-bottom: 1px dashed #bdc3c7; }
+        .editable-field:focus { border-bottom: 1px solid var(--secondary); background: #fffde7; }
+        
+        .room-title { font-size: 13px; font-weight: bold; color: #333; flex: 1; }
+        .manager-title { color: var(--manager); }
+        .room-subject { font-size: 11px; color: #7f8c8d; text-align: right; flex: 1; }
+        
+        .period-row {
+            font-size: 11px; padding: 4px 6px; margin-bottom: 4px; border-radius: 4px;
+            display: flex; justify-content: space-between; align-items: center;
+            background: #fdf2e9; color: #d35400; border: 1px solid #fdebd0;
+        }
+        .period-row.filled { background: var(--secondary); color: white; border-color: var(--secondary); }
+        .period-row.manager-filled { background: var(--manager); color: white; border-color: var(--manager); }
+        .remove-btn { cursor: pointer; font-weight: bold; font-size: 14px; padding-left: 10px;}
+        .remove-btn:hover { color: #ffcccc; }
+
+        .staff-pool {
+            flex: 1; min-width: 300px; max-width: 350px; background: white; border: 1px solid var(--border);
+            border-radius: 6px; padding: 15px; overflow-y: auto; display: flex; flex-direction: column;
+        }
+        .staff-member {
+            background-color: #ecf0f1; border: 1px solid #bdc3c7; padding: 6px 10px; margin-bottom: 8px;
+            border-radius: 4px; cursor: grab; font-size: 13px; display: flex; justify-content: space-between; align-items: center;
+        }
+        .staff-member.exhausted { opacity: 0.5; cursor: not-allowed; background-color: #fdedec; border-color: #fadbd8; }
+        .quota-controls { display: flex; align-items: center; gap: 5px; }
+        .quota-btn {
+            background: #bdc3c7; color: white; border: none; border-radius: 3px;
+            width: 18px; height: 18px; line-height: 16px; text-align: center; cursor: pointer; font-size: 12px; font-weight: bold;
+        }
+        .quota-btn:hover { background: #7f8c8d; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h2>Mock Exam Rota V6 - Auto-Solver Engine</h2>
+        <div class="controls">
+            <button class="btn-magic" onclick="autoFillRota()">✨ Auto-Fill Rota</button>
+            <button class="btn-danger" onclick="clearRota()">🗑️ Clear</button>
+            <button onclick="exportData()">💾 Save</button>
+            <label for="fileInput">📂 Load</label>
+            <input type="file" id="fileInput" accept=".json" onchange="importData(event)">
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="grid-container" id="grid"></div>
+        <div class="staff-pool">
+            <h3 style="margin-top: 0;">Staff Pool</h3>
+            <p style="font-size: 12px; color: #666; line-height: 1.4;">Click ✨ Auto-Fill to have the AI instantly solve the constraints. You can still drag to tweak manually.</p>
+            <div id="staffList"></div>
+        </div>
+    </div>
+
+    <script>
+        // 1. FULL LEWES EXAM SCHEDULE
+        let examSchedule = [
+            // MONDAY AM
+            { day: 'Monday', session: 'AM (P1/P2)', id: 'Mon_AM_Mgr', room: 'Session Manager', subject: 'Overseer', reqPeriods: ['Mon_P1', 'Mon_P2'], isManager: true },
+            { day: 'Monday', session: 'AM (P1/P2)', id: 'Mon_AM_113', room: 'LC113', subject: 'Sociology', reqPeriods: ['Mon_P1', 'Mon_P2'] },
+            { day: 'Monday', session: 'AM (P1/P2)', id: 'Mon_AM_220', room: 'LC220', subject: 'Sociology', reqPeriods: ['Mon_P1', 'Mon_P2'] },
+            { day: 'Monday', session: 'AM (P1/P2)', id: 'Mon_AM_236', room: 'LC236', subject: 'Physics', reqPeriods: ['Mon_P1', 'Mon_P2'] },
+            { day: 'Monday', session: 'AM (P1/P2)', id: 'Mon_AM_326', room: 'LC326 (Computer)', subject: 'Access', reqPeriods: ['Mon_P1', 'Mon_P2'] },
+            { day: 'Monday', session: 'AM (P1/P2)', id: 'Mon_AM_235', room: 'LC235 (Small)', subject: 'Access', reqPeriods: ['Mon_P1', 'Mon_P2'] },
+            
+            // MONDAY PM
+            { day: 'Monday', session: 'PM (P3/P4)', id: 'Mon_PM_Mgr', room: 'Session Manager', subject: 'Overseer', reqPeriods: ['Mon_P3', 'Mon_P4'], isManager: true },
+            { day: 'Monday', session: 'PM (P3/P4)', id: 'Mon_PM_113', room: 'LC113', subject: 'Psychology', reqPeriods: ['Mon_P3', 'Mon_P4'] },
+            { day: 'Monday', session: 'PM (P3/P4)', id: 'Mon_PM_220', room: 'LC220', subject: 'Psychology', reqPeriods: ['Mon_P3', 'Mon_P4'] },
+            { day: 'Monday', session: 'PM (P3/P4)', id: 'Mon_PM_234', room: 'LC234', subject: 'Psychology', reqPeriods: ['Mon_P3', 'Mon_P4'] },
+            { day: 'Monday', session: 'PM (P3/P4)', id: 'Mon_PM_326', room: 'LC326 (Computer)', subject: 'Access', reqPeriods: ['Mon_P3', 'Mon_P4'] },
+            { day: 'Monday', session: 'PM (P3/P4)', id: 'Mon_PM_235', room: 'LC235 (Small)', subject: 'Access', reqPeriods: ['Mon_P3', 'Mon_P4'] },
+            
+            // TUESDAY AM
+            { day: 'Tuesday', session: 'AM (P1/P2)', id: 'Tue_AM_Mgr', room: 'Session Manager', subject: 'Overseer', reqPeriods: ['Tue_P1', 'Tue_P2'], isManager: true },
+            { day: 'Tuesday', session: 'AM (P1/P2)', id: 'Tue_AM_220', room: 'LC220', subject: 'Biology', reqPeriods: ['Tue_P1', 'Tue_P2'] },
+            { day: 'Tuesday', session: 'AM (P1/P2)', id: 'Tue_AM_236', room: 'LC236', subject: 'Biology', reqPeriods: ['Tue_P1', 'Tue_P2'] },
+            { day: 'Tuesday', session: 'AM (P1/P2)', id: 'Tue_AM_234', room: 'LC234', subject: 'Media Studies', reqPeriods: ['Tue_P1', 'Tue_P2'] },
+            { day: 'Tuesday', session: 'AM (P1/P2)', id: 'Tue_AM_235_Med', room: 'LC235', subject: 'Media Studies', reqPeriods: ['Tue_P1', 'Tue_P2'] },
+            { day: 'Tuesday', session: 'AM (P1/P2)', id: 'Tue_AM_326', room: 'LC326 (Computer)', subject: 'Access', reqPeriods: ['Tue_P1', 'Tue_P2'] },
+            { day: 'Tuesday', session: 'AM (P1/P2)', id: 'Tue_AM_Well', room: 'Wellbeing Room', subject: 'Access', reqPeriods: ['Tue_P1', 'Tue_P2'] },
+
+            // TUESDAY PM
+            { day: 'Tuesday', session: 'PM (P3/P4)', id: 'Tue_PM_Mgr', room: 'Session Manager', subject: 'Overseer', reqPeriods: ['Tue_P3', 'Tue_P4'], isManager: true },
+            { day: 'Tuesday', session: 'PM (P3/P4)', id: 'Tue_PM_113', room: 'LC113', subject: 'Business', reqPeriods: ['Tue_P3', 'Tue_P4'] },
+            { day: 'Tuesday', session: 'PM (P3/P4)', id: 'Tue_PM_234', room: 'LC234', subject: 'Business', reqPeriods: ['Tue_P3', 'Tue_P4'] },
+            { day: 'Tuesday', session: 'PM (P3/P4)', id: 'Tue_PM_220', room: 'LC220', subject: 'Env Sci/Span/Film', reqPeriods: ['Tue_P3', 'Tue_P4'] },
+            { day: 'Tuesday', session: 'PM (P3/P4)', id: 'Tue_PM_326', room: 'LC326 (Computer)', subject: 'Access', reqPeriods: ['Tue_P3', 'Tue_P4'] },
+            { day: 'Tuesday', session: 'PM (P3/P4)', id: 'Tue_PM_Well', room: 'Wellbeing Room', subject: 'Access', reqPeriods: ['Tue_P3', 'Tue_P4'] },
+
+            // WEDNESDAY AM
+            { day: 'Wednesday', session: 'AM (P1/P2)', id: 'Wed_AM_Mgr', room: 'Session Manager', subject: 'Overseer', reqPeriods: ['Wed_P1', 'Wed_P2'], isManager: true },
+            { day: 'Wednesday', session: 'AM (P1/P2)', id: 'Wed_AM_113', room: 'LC113', subject: 'English Lit', reqPeriods: ['Wed_P1', 'Wed_P2'] },
+            { day: 'Wednesday', session: 'AM (P1/P2)', id: 'Wed_AM_220', room: 'LC220', subject: 'Eng Lang & Lit', reqPeriods: ['Wed_P1', 'Wed_P2'] },
+            { day: 'Wednesday', session: 'AM (P1/P2)', id: 'Wed_AM_234', room: 'LC234', subject: 'Maths 1', reqPeriods: ['Wed_P1', 'Wed_P2'] },
+            { day: 'Wednesday', session: 'AM (P1/P2)', id: 'Wed_AM_235_Math', room: 'LC235', subject: 'Maths 1', reqPeriods: ['Wed_P1', 'Wed_P2'] },
+            { day: 'Wednesday', session: 'AM (P1/P2)', id: 'Wed_AM_236', room: 'LC236', subject: 'Maths 1', reqPeriods: ['Wed_P1', 'Wed_P2'] },
+            { day: 'Wednesday', session: 'AM (P1/P2)', id: 'Wed_AM_326', room: 'LC326 (Computer)', subject: 'Access', reqPeriods: ['Wed_P1', 'Wed_P2'] },
+
+            // WEDNESDAY PM
+            { day: 'Wednesday', session: 'PM (P3/P4)', id: 'Wed_PM_Mgr', room: 'Session Manager', subject: 'Overseer', reqPeriods: ['Wed_P3', 'Wed_P4'], isManager: true },
+            { day: 'Wednesday', session: 'PM (P3/P4)', id: 'Wed_PM_113', room: 'LC113', subject: 'History', reqPeriods: ['Wed_P3', 'Wed_P4'] },
+            { day: 'Wednesday', session: 'PM (P3/P4)', id: 'Wed_PM_220', room: 'LC220', subject: 'Geography', reqPeriods: ['Wed_P3', 'Wed_P4'] },
+            { day: 'Wednesday', session: 'PM (P3/P4)', id: 'Wed_PM_236', room: 'LC236', subject: 'Med/Marine Sci', reqPeriods: ['Wed_P3', 'Wed_P4'] },
+            { day: 'Wednesday', session: 'PM (P3/P4)', id: 'Wed_PM_326', room: 'LC326 (Computer)', subject: 'Access', reqPeriods: ['Wed_P3', 'Wed_P4'] },
+
+            // THURSDAY AM
+            { day: 'Thursday', session: 'AM (P1/P2)', id: 'Thu_AM_Mgr', room: 'Session Manager', subject: 'Overseer', reqPeriods: ['Thu_P1', 'Thu_P2'], isManager: true },
+            { day: 'Thursday', session: 'AM (P1/P2)', id: 'Thu_AM_113', room: 'LC113', subject: 'Law', reqPeriods: ['Thu_P1', 'Thu_P2'] },
+            { day: 'Thursday', session: 'AM (P1/P2)', id: 'Thu_AM_234', room: 'LC234', subject: 'Law', reqPeriods: ['Thu_P1', 'Thu_P2'] },
+            { day: 'Thursday', session: 'AM (P1/P2)', id: 'Thu_AM_PA514', room: 'PA514', subject: 'Music', reqPeriods: ['Thu_P1', 'Thu_P2'] },
+            { day: 'Thursday', session: 'AM (P1/P2)', id: 'Thu_AM_326', room: 'LC326 (Computer)', subject: 'Access', reqPeriods: ['Thu_P1', 'Thu_P2'] },
+
+            // THURSDAY PM
+            { day: 'Thursday', session: 'PM (P3/P4)', id: 'Thu_PM_Mgr', room: 'Session Manager', subject: 'Overseer', reqPeriods: ['Thu_P3', 'Thu_P4'], isManager: true },
+            { day: 'Thursday', session: 'PM (P3/P4)', id: 'Thu_PM_113', room: 'LC113', subject: 'Philosophy & Politics', reqPeriods: ['Thu_P3', 'Thu_P4'] },
+            { day: 'Thursday', session: 'PM (P3/P4)', id: 'Thu_PM_236', room: 'LC236', subject: 'F.Maths & Eng Lang', reqPeriods: ['Thu_P3', 'Thu_P4'] },
+            { day: 'Thursday', session: 'PM (P3/P4)', id: 'Thu_PM_PA514', room: 'PA514', subject: 'Music', reqPeriods: ['Thu_P3', 'Thu_P4'] },
+            { day: 'Thursday', session: 'PM (P3/P4)', id: 'Thu_PM_326', room: 'LC326 (Computer)', subject: 'Access', reqPeriods: ['Thu_P3', 'Thu_P4'] },
+
+            // FRIDAY AM
+            { day: 'Friday', session: 'AM (P1/P2)', id: 'Fri_AM_Mgr', room: 'Session Manager', subject: 'Overseer', reqPeriods: ['Fri_P1', 'Fri_P2'], isManager: true },
+            { day: 'Friday', session: 'AM (P1/P2)', id: 'Fri_AM_236', room: 'LC236', subject: 'Chemistry', reqPeriods: ['Fri_P1', 'Fri_P2'] },
+            { day: 'Friday', session: 'AM (P1/P2)', id: 'Fri_AM_234', room: 'LC234', subject: 'Class Civ', reqPeriods: ['Fri_P1', 'Fri_P2'] },
+            { day: 'Friday', session: 'AM (P1/P2)', id: 'Fri_AM_326', room: 'LC326 (Computer)', subject: 'Access', reqPeriods: ['Fri_P1', 'Fri_P2'] },
+            { day: 'Friday', session: 'AM (P1/P2)', id: 'Fri_AM_325', room: 'LC325 (Small)', subject: 'Access', reqPeriods: ['Fri_P1', 'Fri_P2'] },
+
+            // FRIDAY PM
+            { day: 'Friday', session: 'PM (P3/P4)', id: 'Fri_PM_Mgr', room: 'Session Manager', subject: 'Overseer', reqPeriods: ['Fri_P3', 'Fri_P4'], isManager: true },
+            { day: 'Friday', session: 'PM (P3/P4)', id: 'Fri_PM_234', room: 'LC234', subject: 'Maths 2', reqPeriods: ['Fri_P3', 'Fri_P4'] },
+            { day: 'Friday', session: 'PM (P3/P4)', id: 'Fri_PM_235', room: 'LC235', subject: 'Maths 2', reqPeriods: ['Fri_P3', 'Fri_P4'] },
+            { day: 'Friday', session: 'PM (P3/P4)', id: 'Fri_PM_236', room: 'LC236', subject: 'Maths 2', reqPeriods: ['Fri_P3', 'Fri_P4'] },
+            { day: 'Friday', session: 'PM (P3/P4)', id: 'Fri_PM_113', room: 'LC113', subject: 'Economics', reqPeriods: ['Fri_P3', 'Fri_P4'] },
+            { day: 'Friday', session: 'PM (P3/P4)', id: 'Fri_PM_220', room: 'LC220', subject: 'Computer Science', reqPeriods: ['Fri_P3', 'Fri_P4'] },
+            { day: 'Friday', session: 'PM (P3/P4)', id: 'Fri_PM_326', room: 'LC326 (Computer)', subject: 'Access', reqPeriods: ['Fri_P3', 'Fri_P4'] }
+        ];
+
+        // 2. FULL STAFF POOL & AVAILABILITY
+        const FULL_AVAILABILITY = [
+            'Mon_P1', 'Mon_P2', 'Mon_P3', 'Mon_P4', 'Tue_P1', 'Tue_P2', 'Tue_P3', 'Tue_P4', 
+            'Wed_P1', 'Wed_P2', 'Wed_P3', 'Wed_P4', 'Thu_P1', 'Thu_P2', 'Thu_P3', 'Thu_P4', 
+            'Fri_P1', 'Fri_P2', 'Fri_P3', 'Fri_P4'
+        ];
+
+        // Manager IDs for Solver
+        const managerIds = ['s1', 's10', 's11'];
+
+        let staffData = [
+            { id: 's1', name: 'Stephen Robinson', max: 4, used: 0, available: FULL_AVAILABILITY },
+            { id: 's2', name: 'Joe Tindall', max: 4, used: 0, available: ['Mon_P2', 'Mon_P3', 'Tue_P1', 'Tue_P4', 'Wed_P1', 'Wed_P2', 'Wed_P3', 'Wed_P4', 'Thu_P1', 'Thu_P2', 'Thu_P3', 'Fri_P2', 'Fri_P3', 'Fri_P4'] },
+            { id: 's3', name: 'Sara Pugh', max: 4, used: 0, available: ['Mon_P2', 'Mon_P4', 'Tue_P1', 'Tue_P3', 'Wed_P2', 'Wed_P3', 'Wed_P4', 'Thu_P1', 'Fri_P1', 'Fri_P4'] },
+            { id: 's4', name: 'Marcus Osler', max: 4, used: 0, available: ['Mon_P1', 'Mon_P3', 'Mon_P4', 'Tue_P2', 'Tue_P3', 'Tue_P4', 'Wed_P2', 'Wed_P4', 'Thu_P1', 'Thu_P3', 'Thu_P4', 'Fri_P1', 'Fri_P2', 'Fri_P4'] },
+            { id: 's5', name: 'Paul Graham', max: 4, used: 0, available: ['Mon_P1', 'Mon_P2', 'Mon_P3', 'Tue_P1', 'Tue_P4', 'Wed_P1', 'Wed_P2', 'Wed_P4', 'Thu_P1', 'Thu_P2', 'Thu_P4', 'Fri_P1', 'Fri_P2', 'Fri_P3', 'Fri_P4'] },
+            { id: 's6', name: 'Aditi Sood', max: 3, used: 0, available: ['Mon_P2', 'Mon_P3', 'Mon_P4', 'Tue_P1', 'Tue_P3', 'Tue_P4', 'Wed_P1', 'Wed_P3', 'Thu_P2', 'Thu_P3', 'Thu_P4', 'Fri_P2', 'Fri_P3'] },
+            { id: 's7', name: 'Victoria Grigg', max: 3, used: 0, available: ['Mon_P1', 'Mon_P3', 'Mon_P4', 'Tue_P2', 'Tue_P3', 'Tue_P4', 'Wed_P4', 'Thu_P1', 'Thu_P2', 'Thu_P3', 'Thu_P4'] },
+            { id: 's8', name: 'Andrew Mann', max: 3, used: 0, available: ['Mon_P2', 'Mon_P4', 'Tue_P1', 'Tue_P3', 'Wed_P1', 'Wed_P2', 'Wed_P3', 'Wed_P4', 'Thu_P1', 'Thu_P2', 'Thu_P3', 'Fri_P1', 'Fri_P3', 'Fri_P4'] },
+            { id: 's9', name: 'Alice Wallman', max: 3, used: 0, available: ['Mon_P1', 'Mon_P2', 'Mon_P3', 'Mon_P4', 'Wed_P3', 'Wed_P4', 'Thu_P3', 'Thu_P4', 'Fri_P1', 'Fri_P2'] },
+            { id: 's10', name: 'Paul Davies', max: 3, used: 0, available: ['Mon_P1', 'Mon_P2', 'Mon_P3', 'Tue_P1', 'Tue_P2', 'Tue_P4', 'Wed_P1', 'Wed_P2', 'Wed_P3', 'Wed_P4', 'Thu_P1', 'Thu_P2', 'Thu_P3', 'Thu_P4', 'Fri_P2', 'Fri_P3', 'Fri_P4'] },
+            { id: 's11', name: 'Michele Plant', max: 3, used: 0, available: ['Tue_P1', 'Tue_P2', 'Tue_P3', 'Tue_P4', 'Wed_P3', 'Wed_P4', 'Thu_P3', 'Thu_P4', 'Fri_P1', 'Fri_P2'] },
+            { id: 's12', name: 'Clare Grant', max: 3, used: 0, available: ['Mon_P1', 'Mon_P4', 'Tue_P2', 'Tue_P3', 'Thu_P1', 'Thu_P2', 'Thu_P4', 'Fri_P1', 'Fri_P3', 'Fri_P4'] },
+            { id: 's13', name: 'Keith Gage', max: 3, used: 0, available: FULL_AVAILABILITY },
+            { id: 's14', name: 'Justine McLean', max: 3, used: 0, available: ['Mon_P3', 'Mon_P4', 'Tue_P2', 'Tue_P3', 'Wed_P1', 'Wed_P3', 'Wed_P4', 'Thu_P2', 'Thu_P3', 'Fri_P1', 'Fri_P2', 'Fri_P3'] },
+            { id: 's15', name: 'Adam Butterfill', max: 2, used: 0, available: ['Mon_P2', 'Mon_P3', 'Tue_P1', 'Tue_P4', 'Thu_P2', 'Fri_P2', 'Fri_P3'] },
+            { id: 's16', name: 'Helen McGregor', max: 2, used: 0, available: ['Mon_P1', 'Mon_P2', 'Mon_P3', 'Tue_P1', 'Tue_P2', 'Tue_P4', 'Thu_P1', 'Thu_P3', 'Thu_P4'] },
+            { id: 's17', name: 'Andrea Bamber', max: 2, used: 0, available: ['Wed_P2', 'Wed_P3', 'Wed_P4', 'Thu_P1', 'Thu_P3', 'Thu_P4', 'Fri_P1', 'Fri_P2', 'Fri_P4'] },
+            { id: 's18', name: 'Max Topan', max: 2, used: 0, available: ['Mon_P1', 'Mon_P3', 'Mon_P4', 'Tue_P2', 'Tue_P3', 'Tue_P4', 'Thu_P1', 'Thu_P2', 'Thu_P4'] },
+            { id: 's19', name: 'Montserrat Gomez', max: 2, used: 0, available: ['Mon_P2', 'Mon_P3', 'Mon_P4', 'Tue_P1', 'Tue_P3', 'Tue_P4', 'Wed_P1', 'Wed_P2', 'Wed_P3'] },
+            { id: 's20', name: 'Rupert Shortt', max: 1, used: 0, available: ['Tue_P1', 'Tue_P2', 'Tue_P4', 'Thu_P3', 'Thu_P4', 'Fri_P1', 'Fri_P2'] },
+            { id: 's21', name: 'Andrea Kilding', max: 1, used: 0, available: ['Mon_P1', 'Mon_P3', 'Mon_P4', 'Tue_P2', 'Tue_P3', 'Tue_P4', 'Wed_P1', 'Wed_P2', 'Wed_P4'] },
+            { id: 's22', name: 'Jay Turgoose', max: 1, used: 0, available: ['Mon_P1', 'Mon_P2', 'Tue_P1', 'Tue_P2', 'Tue_P3', 'Tue_P4', 'Wed_P1', 'Wed_P2', 'Wed_P3', 'Wed_P4', 'Thu_P1', 'Thu_P2', 'Thu_P3', 'Thu_P4', 'Fri_P3', 'Fri_P4'] },
+            { id: 's23', name: 'Eleanor Ferguson', max: 1, used: 0, available: ['Mon_P1', 'Mon_P2', 'Mon_P3', 'Mon_P4', 'Tue_P1', 'Tue_P2', 'Tue_P3', 'Tue_P4'] },
+            { id: 's24', name: 'Roseanna Sonnenberg', max: 1, used: 0, available: ['Mon_P2', 'Mon_P3', 'Mon_P4', 'Tue_P1', 'Tue_P3', 'Tue_P4', 'Wed_P1', 'Wed_P2', 'Wed_P3'] },
+            { id: 's25', name: 'Jeniffer Michaels', max: 1, used: 0, available: FULL_AVAILABILITY },
+            { id: 's26', name: 'Gabrielle Bonner', max: 1, used: 0, available: ['Tue_P1', 'Tue_P2', 'Thu_P1', 'Thu_P2', 'Thu_P3', 'Thu_P4'] }
+        ];
+
+        let rotaState = {};
+
+        function init() {
+            examSchedule.forEach(exam => {
+                if (!rotaState[exam.id]) {
+                    rotaState[exam.id] = {};
+                    exam.reqPeriods.forEach(p => rotaState[exam.id][p] = null);
+                }
+            });
+            renderGrid(); renderStaff();
+        }
+
+        function isStaffAlreadyWorkingPeriod(staffId, period) {
+            for (const examId in rotaState) {
+                if (rotaState[examId][period] === staffId) return true;
+            }
+            return false;
+        }
+
+        function updateExamDetail(examId, field, value) {
+            const exam = examSchedule.find(e => e.id === examId);
+            if (exam) exam[field] = value.trim();
+        }
+
+        // --- THE AI SOLVER ENGINE ---
+        function autoFillRota() {
+            examSchedule.forEach(exam => {
+                // Determine empty periods for this room
+                let emptyPeriods = exam.reqPeriods.filter(p => rotaState[exam.id][p] === null);
+                if (emptyPeriods.length === 0) return;
+
+                // Function to filter and sort available staff
+                const getCandidates = (periodsList) => {
+                    let candidates = staffData.filter(s => {
+                        if (s.used + (periodsList.length * 0.5) > s.max) return false; // Quota check
+                        return periodsList.every(p => s.available.includes(p) && !isStaffAlreadyWorkingPeriod(s.id, p));
+                    });
+
+                    // If it's a manager slot, strictly try to assign managers first
+                    if (exam.isManager) {
+                        let mCandidates = candidates.filter(c => managerIds.includes(c.id));
+                        if (mCandidates.length > 0) candidates = mCandidates;
+                    }
+
+                    // Sort by highest remaining quota to balance load
+                    return candidates.sort((a, b) => (b.max - b.used) - (a.max - a.used));
+                };
+
+                // PASS 1: Try to assign ONE person to the entire block (to avoid splits)
+                let fullCandidates = getCandidates(emptyPeriods);
+                if (fullCandidates.length > 0) {
+                    let chosen = fullCandidates[0];
+                    emptyPeriods.forEach(p => { rotaState[exam.id][p] = chosen.id; });
+                    chosen.used += (emptyPeriods.length * 0.5);
+                    return; // Done with this room
+                }
+
+                // PASS 2: If we couldn't find a full-block person, find split-shift relays
+                emptyPeriods.forEach(p => {
+                    let singleCandidates = getCandidates([p]);
+                    if (singleCandidates.length > 0) {
+                        let chosen = singleCandidates[0];
+                        rotaState[exam.id][p] = chosen.id;
+                        chosen.used += 0.5;
+                    }
+                });
+            });
+
+            renderGrid(); renderStaff();
+            alert("Auto-Fill Complete! Empty slots indicate periods where no staff with available quota and timetable free-time could be found.");
+        }
+
+        function clearRota() {
+            if(!confirm("Are you sure you want to clear all assignments?")) return;
+            staffData.forEach(s => s.used = 0);
+            for (const examId in rotaState) {
+                for (const period in rotaState[examId]) {
+                    rotaState[examId][period] = null;
+                }
+            }
+            renderGrid(); renderStaff();
+        }
+
+        // --- RENDER LOGIC ---
+        function renderGrid() {
+            const grid = document.getElementById('grid');
+            grid.innerHTML = '';
+            const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+
+            days.forEach(day => {
+                const col = document.createElement('div');
+                col.className = 'day-column';
+                col.innerHTML = `<div class="day-header">${day}</div>`;
+
+                ['AM (P1/P2)', 'PM (P3/P4)'].forEach(session => {
+                    const block = document.createElement('div');
+                    block.className = 'session-block';
+                    block.innerHTML = `<div class="session-title">${session}</div>`;
+
+                    const slots = examSchedule.filter(e => e.day === day && e.session === session);
+                    
+                    slots.forEach(exam => {
+                        const slotEl = document.createElement('div');
+                        slotEl.className = `room-slot ${exam.isManager ? 'manager-slot' : ''}`;
+                        
+                        let headerHTML = `
+                            <div class="room-header">
+                                <span class="room-title editable-field ${exam.isManager ? 'manager-title' : ''}" 
+                                      contenteditable="true" 
+                                      onblur="updateExamDetail('${exam.id}', 'room', this.innerText)">${exam.room}</span>
+                                <span class="room-subject editable-field" 
+                                      contenteditable="true" 
+                                      onblur="updateExamDetail('${exam.id}', 'subject', this.innerText)">${exam.subject}</span>
+                            </div>`;
+                        
+                        let periodsHTML = '';
+                        exam.reqPeriods.forEach(period => {
+                            const pName = period.split('_')[1];
+                            const staffId = rotaState[exam.id][period];
+                            
+                            if (staffId) {
+                                const staff = staffData.find(s => s.id === staffId);
+                                const styleClass = exam.isManager ? 'manager-filled' : 'filled';
+                                periodsHTML += `
+                                    <div class="period-row ${styleClass}">
+                                        <span>${pName}: ${staff.name}</span>
+                                        <span class="remove-btn" onclick="removeStaff('${exam.id}', '${period}')">×</span>
+                                    </div>`;
+                            } else {
+                                periodsHTML += `<div class="period-row"><span>${pName}: Empty</span></div>`;
+                            }
+                        });
+
+                        slotEl.innerHTML = headerHTML + periodsHTML;
+
+                        slotEl.addEventListener('dragover', e => { e.preventDefault(); slotEl.classList.add('dragover'); });
+                        slotEl.addEventListener('dragleave', () => slotEl.classList.remove('dragover'));
+                        slotEl.addEventListener('drop', e => {
+                            e.preventDefault(); slotEl.classList.remove('dragover');
+                            handleDrop(e.dataTransfer.getData('text/plain'), exam);
+                        });
+
+                        block.appendChild(slotEl);
+                    });
+                    col.appendChild(block);
+                });
+                grid.appendChild(col);
+            });
+        }
+
+        function renderStaff() {
+            const list = document.getElementById('staffList');
+            list.innerHTML = '';
+            
+            const sortedStaff = [...staffData].sort((a, b) => (b.max - b.used) - (a.max - a.used));
+
+            sortedStaff.forEach(staff => {
+                const el = document.createElement('div');
+                el.className = `staff-member ${staff.used >= staff.max ? 'exhausted' : ''}`;
+                el.draggable = staff.used < staff.max;
+                
+                el.innerHTML = `
+                    <span>${staff.name}</span> 
+                    <div class="quota-controls">
+                        <button class="quota-btn" onclick="changeQuota('${staff.id}', -1)">-</button>
+                        <strong>${staff.used.toFixed(1)}/${staff.max}</strong>
+                        <button class="quota-btn" onclick="changeQuota('${staff.id}', 1)">+</button>
+                    </div>`;
+                
+                if (staff.used < staff.max) {
+                    el.addEventListener('dragstart', e => e.dataTransfer.setData('text/plain', staff.id));
+                }
+                list.appendChild(el);
+            });
+        }
+
+        function changeQuota(staffId, amount) {
+            const staff = staffData.find(s => s.id === staffId);
+            if (staff) {
+                staff.max += amount;
+                if (staff.max < 0) staff.max = 0;
+                renderStaff();
+            }
+        }
+
+        function handleDrop(staffId, exam) {
+            const staff = staffData.find(s => s.id === staffId);
+            if (!staff || staff.used >= staff.max) return;
+
+            const emptyPeriods = exam.reqPeriods.filter(p => rotaState[exam.id][p] === null);
+            if (emptyPeriods.length === 0) return alert("This room is already fully staffed!");
+
+            const freeFromTeaching = emptyPeriods.filter(p => staff.available.includes(p));
+            if (freeFromTeaching.length === 0) return alert(`CLASH: ${staff.name} is teaching/unavailable during these periods.`);
+
+            const trulyAvailablePeriods = freeFromTeaching.filter(p => !isStaffAlreadyWorkingPeriod(staffId, p));
+            if (trulyAvailablePeriods.length === 0) return alert(`CLASH: ${staff.name} is already assigned to another room during this time!`);
+
+            const requiredQuota = trulyAvailablePeriods.length * 0.5;
+            if (staff.used + requiredQuota > staff.max) return alert(`${staff.name} does not have enough quota left to cover this!`);
+
+            trulyAvailablePeriods.forEach(p => rotaState[exam.id][p] = staffId);
+            staff.used += requiredQuota;
+            
+            renderGrid(); renderStaff();
+        }
+
+        function removeStaff(examId, period) {
+            const staffId = rotaState[examId][period];
+            if (!staffId) return;
+            rotaState[examId][period] = null;
+            const staff = staffData.find(s => s.id === staffId);
+            if (staff) staff.used -= 0.5;
+            renderGrid(); renderStaff();
+        }
+
+        function exportData() {
+            const a = document.createElement('a');
+            a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ staffData, rotaState, examSchedule })); 
+            a.download = "lewes-rota-v6.json"; a.click();
+        }
+
+        function importData(e) {
+            const reader = new FileReader();
+            reader.onload = ev => {
+                const data = JSON.parse(ev.target.result);
+                staffData = data.staffData; 
+                rotaState = data.rotaState;
+                if(data.examSchedule) examSchedule = data.examSchedule;
+                renderGrid(); renderStaff();
+            };
+            reader.readAsText(e.target.files[0]); e.target.value = '';
+        }
+
+        init();
+    </script>
+</body>
+</html>

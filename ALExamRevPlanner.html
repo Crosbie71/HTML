@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2026 Public Exam Planner</title>
+    <style>
+        :root { --primary: #3498db; --secondary: #2c3e50; --success: #27ae60; --bg: #f4f7f6; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 10px; display: flex; flex-direction: column; height: 100vh; }
+        h1 { text-align: center; color: var(--secondary); margin: 10px 0; font-size: 1.4rem; flex-shrink: 0;}
+        .container { display: flex; gap: 15px; flex: 1; overflow: hidden; }
+        
+        /* Sidebar */
+        .sidebar { width: 320px; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; flex-direction: column; flex-shrink: 0;}
+        .controls { background: #f9f9f9; padding: 10px; border-radius: 4px; margin-bottom: 10px; border: 1px solid #eee; font-size: 0.85rem; }
+        .controls label { cursor: pointer; display: flex; align-items: center; gap: 5px; font-weight: bold; color: #444; }
+
+        .subject-scroll { flex: 1; overflow-y: auto; border: 1px solid #eee; padding: 10px; margin-bottom: 10px; border-radius: 4px; }
+        .sub-row { display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid #f9f9f9; font-size: 0.95rem; }
+        .sub-row:hover { background: #f9f9f9; }
+        .sub-row label { cursor: pointer; flex: 1; margin-left: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
+        .color-lozenge {
+            display: inline-block; width: 20px; height: 20px; border-radius: 4px; margin: 0 4px; 
+            cursor: pointer; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: transform 0.1s;
+        }
+        .color-lozenge:active { transform: scale(0.9); }
+
+        /* Calendar */
+        .calendar-container { flex: 1; overflow-y: auto; overflow-x: auto; padding-right: 5px; }
+        .week-grid { display: grid; gap: 5px; background: #fff; padding: 10px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ddd; min-width: 700px; }
+        .week-header { grid-column: 1 / -1; font-weight: bold; padding: 10px; background: var(--secondary); color: white; border-radius: 4px; text-align: center; position: sticky; left: 0; }
+        .day-label { font-weight: bold; text-align: center; padding: 5px; background: #eee; font-size: 0.75rem; border-radius: 3px; }
+        .time-col { font-weight: bold; display: flex; align-items: center; justify-content: center; background: #f9f9f9; font-size: 0.7rem; border-radius: 3px; }
+        
+        .slot { background: #fff; border: 1px dashed #ccc; min-height: 80px; padding: 4px; display: flex; flex-direction: column; gap: 4px; cursor: pointer; }
+        .slot.exam-slot { background: #fff8f8; border-style: solid; border-color: #ffcccc; cursor: default; }
+        .slot.weekend { background: #f0f0f0; border: none; }
+
+        /* Items */
+        .item { padding: 8px 4px; border-radius: 4px; color: #fff; font-size: 0.75rem; cursor: grab; box-shadow: 0 1px 3px rgba(0,0,0,0.2); text-align: center; line-height: 1.2; user-select: none; touch-action: manipulation; position: relative;}
+        .item.selected { outline: 3px solid #2ecc71; transform: scale(1.02); box-shadow: 0 4px 8px rgba(0,0,0,0.3); z-index: 10; }
+        
+        /* Exam Block Enhancements */
+        .item.exam { border: 2px solid rgba(0,0,0,0.5); cursor: default; text-shadow: 0px 1px 2px rgba(0,0,0,0.4); }
+        .item.exam .sub-title { font-weight: bold; font-size: 0.85rem; text-transform: uppercase; }
+        .item.exam .paper-title { font-size: 0.65rem; font-weight: normal; opacity: 0.95; margin-top: 3px; }
+        .item.revision { opacity: 0.95; font-size: 0.75rem; cursor: pointer; }
+
+        .clash-warning { font-size:0.6rem; color:#fff; background:#e74c3c; border-radius:3px; padding:3px; margin-bottom:4px; font-weight:bold; text-shadow:none; letter-spacing:0.5px; }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7); }
+            70% { box-shadow: 0 0 0 6px rgba(231, 76, 60, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 900px) {
+            .container { flex-direction: column; overflow: visible; }
+            .sidebar { width: auto; max-height: none; flex-shrink: 0; }
+            .subject-scroll { max-height: 40vh; } 
+            .calendar-container { overflow-y: visible; padding-right: 0; }
+            body { height: auto; overflow-x: hidden; }
+        }
+
+		/* Print Design */
+				@media print {
+					@page { margin: 1cm; } /* Let the user's printer choose Portrait/Landscape naturally */
+					.sidebar { display: none !important; }
+					
+					/* Flexible, squishable grid for Portrait A4 */
+					.week-grid { 
+						border: 2px solid #000; 
+						box-shadow: none; 
+						margin-bottom: 15px; 
+						break-inside: avoid; 
+						min-width: 0 !important; 
+						width: 100% !important;
+						gap: 2px !important; /* Tighter gaps to save horizontal space */
+						padding: 4px !important;
+					}
+					
+					/* Shrink text and padding so 8 columns fit upright */
+					.day-label { font-size: 0.65rem !important; padding: 3px !important; }
+					.time-col { font-size: 0.6rem !important; }
+					.slot { border: 1px solid #bbb !important; padding: 2px !important; min-height: 65px !important; }
+					
+					.item { font-size: 0.6rem !important; padding: 4px 2px !important; line-height: 1.1 !important; }
+					.item.exam .sub-title { font-size: 0.7rem !important; }
+					.item.exam .paper-title { font-size: 0.55rem !important; }
+					.clash-warning { font-size: 0.55rem !important; padding: 2px !important; }
+					
+					/* Keep the 2-week page breaks */
+					.print-page-break { page-break-after: always; }
+					
+					body { background: white; height: auto; overflow: visible; padding: 0; margin: 0; }
+					.calendar-container { overflow: visible; padding: 0; width: 100%; }
+					* { 
+						-webkit-print-color-adjust: exact !important; 
+						print-color-adjust: exact !important; 
+						box-sizing: border-box !important; 
+					}
+				}
+    </style>
+</head>
+<body>
+
+<h1>2026 Exam Revision Planner</h1>
+
+<div class="container">
+    <div class="sidebar">
+        <div class="controls">
+            <label><input type="checkbox" id="shadeToggle" checked onchange="refreshAllSubjects()"> Distinct Paper Shades</label>
+        </div>
+
+        <strong>Tap Your Subjects</strong>
+        <p style="font-size: 0.75rem; color: #666; margin: 5px 0 0 0;">(Mobile: Tap a block, then tap a slot to move it)</p>
+        <div class="subject-scroll" id="subjectList"></div>
+        
+        <button onclick="clearPlan()" style="background:#e74c3c; color:white; border:none; padding:12px; border-radius:4px; cursor:pointer; font-weight:bold;">Reset Everything</button>
+        <button onclick="window.print()" style="background:var(--success); color:white; border:none; padding:12px; border-radius:4px; margin-top:10px; cursor:pointer; font-weight:bold;">Print PDF (2 Weeks/Page)</button>
+    </div>
+
+    <div class="calendar-container" id="calendar"></div>
+</div>
+
+<script>
+// FULL RTF DATA - With reserve clash slots enabled
+const EXAM_DB = [
+    { date: "2026-04-28", times: ["AM"], sub: "Marine Science A Level", title: "DATA-HANDLING 22" },
+    { date: "2026-05-01", times: ["AM"], sub: "Applied Science L3 Dip", title: "INVESTIGATION SKILLS (A)" },
+    { date: "2026-05-01", times: ["AM"], sub: "Applied Science L3 Dip", title: "INVESTIGATION SKILLS (B)" },
+    { date: "2026-05-04", times: ["AM"], sub: "Marine Science A Level", title: "THEORY PAPER 32" },
+    { date: "2026-05-05", times: ["AM"], sub: "Maths Level 1", title: "Maths FS1" },
+    { date: "2026-05-06", times: ["AM"], sub: "English Level 1", title: "Reading FS1" },
+    { date: "2026-05-06", times: ["AM"], sub: "English Level 1", title: "Writing FS1" },
+    { date: "2026-05-06", times: ["AM"], sub: "English Level 2", title: "Reading FS2" },
+    { date: "2026-05-07", times: ["AM"], sub: "English GCSE", title: "[Deadline] SPOKEN LANG" },
+    { date: "2026-05-07", times: ["AM"], sub: "Marine Science A Level", title: "DATA-HANDLING 42" },
+    { date: "2026-05-07", times: ["AM"], sub: "Applied Science L3 Dip", title: "APPS OF CRIMINOLOGY" },
+    { date: "2026-05-07", times: ["PM"], sub: "Business L3 Cert", title: "MARKETING CAMPAIGN (A)" },
+    { date: "2026-05-08", times: ["AM"], sub: "Business L3 Cert", title: "MARKETING CAMPAIGN (B)" },
+    { date: "2026-05-11", times: ["AM"], sub: "English Lang/Lit A Level", title: "EXP NONFCTN SPK TXT" },
+    { date: "2026-05-11", times: ["AM"], sub: "Biology AS Level", title: "PAPER 1" },
+    { date: "2026-05-11", times: ["AM"], sub: "Economics A Level", title: "ADV PAPER 1" },
+    { date: "2026-05-11", times: ["AM"], sub: "English Language A Level", title: "ADV PAPER 1" },
+    { date: "2026-05-11", times: ["PM"], sub: "Psychology AS Level", title: "PAPER 1" },
+    { date: "2026-05-12", times: ["AM"], sub: "Economics AS Level", title: "PAPER 1" },
+    { date: "2026-05-12", times: ["AM"], sub: "Sociology AS Level", title: "PAPER 1" },
+    { date: "2026-05-12", times: ["AM"], sub: "Philosophy A Level", title: "ADV PAPER 1" },
+    { date: "2026-05-12", times: ["AM"], sub: "Geography A Level", title: "PAPER ONE" },
+    { date: "2026-05-12", times: ["PM"], sub: "Classical Civilisation A Level", title: "WORLD OF THE HERO" },
+    { date: "2026-05-12", times: ["PM"], sub: "Biology GCSE", title: "PAPER ONE (H)" },
+    { date: "2026-05-13", times: ["AM"], sub: "English Literature A Level", title: "DRAMA & POETRY" },
+    { date: "2026-05-13", times: ["AM"], sub: "Physics AS Level", title: "CORE PHYSICS I" },
+    { date: "2026-05-13", times: ["PM"], sub: "Business Studies A Level", title: "MARKET, PEOPLE & GLOBAL" },
+    { date: "2026-05-13", times: ["PM"], sub: "History AS Level", title: "RUSSIA 1917-91" },
+    { date: "2026-05-13", times: ["PM"], sub: "Health & Social Care L3", title: "EQUALITY DIVERSITY" },
+    { date: "2026-05-14", times: ["AM", "PM"], sub: "Criminology L3 Dip", title: "Unit 2: Paper Based" },
+    { date: "2026-05-14", times: ["AM"], sub: "Maths GCSE", title: "NON CALCULATOR (F)" },
+    { date: "2026-05-14", times: ["PM"], sub: "Media A Level", title: "Comp 1 Media Products" },
+    { date: "2026-05-14", times: ["PM"], sub: "Mathematics AS Level", title: "PURE MATHEMATICS" },
+    { date: "2026-05-15", times: ["AM"], sub: "Geography A Level", title: "[Deadline] INDEPENDENT INVEST" },
+    { date: "2026-05-15", times: ["AM"], sub: "Psychology A Level", title: "ADV PAPER 1" },
+    { date: "2026-05-15", times: ["AM"], sub: "Business AS Level", title: "MARKETING AND PEOPLE" },
+    { date: "2026-05-15", times: ["PM"], sub: "Health & Social Care L3", title: "HEALTH SAFETY&SECURITY" },
+    { date: "2026-05-18", times: ["AM"], sub: "Medical Science L3", title: "Unit 1 Paper NEW" },
+    { date: "2026-05-18", times: ["AM"], sub: "Economics AS Level", title: "PAPER 2" },
+    { date: "2026-05-18", times: ["AM", "PM"], sub: "Sociology A Level", title: "ADV PAPER 1" },
+    { date: "2026-05-18", times: ["AM"], sub: "Environmental Science A Level", title: "ADV PAPER 1" },
+    { date: "2026-05-18", times: ["PM"], sub: "Economics A Level", title: "ADV PAPER 2" },
+    { date: "2026-05-18", times: ["PM"], sub: "History AS Level", title: "CHINA & GDR" },
+    { date: "2026-05-18", times: ["PM"], sub: "Health & Social Care L3", title: "ANATOMY & PHYSIOLOGY" },
+    { date: "2026-05-18", times: ["PM"], sub: "Classical Civilisation A Level", title: "INVNTON OF BARBARIAN" },
+    { date: "2026-05-19", times: ["AM"], sub: "Applied Science L3 Dip", title: "CHEMISTRY" },
+    { date: "2026-05-19", times: ["AM", "PM"], sub: "Business Studies A Level", title: "ACTIVS,DECISION & STRATS" },
+    { date: "2026-05-19", times: ["AM"], sub: "Sociology AS Level", title: "PAPER 2" },
+    { date: "2026-05-19", times: ["AM"], sub: "Philosophy A Level", title: "ADV PAPER 2" },
+    { date: "2026-05-19", times: ["PM"], sub: "Psychology AS Level", title: "PAPER 2" },
+    { date: "2026-05-19", times: ["PM"], sub: "History A Level", title: "RUSSIA 1917-91" },
+    { date: "2026-05-19", times: ["PM"], sub: "Applied Science L3 Dip", title: "BIOLOGY" },
+    { date: "2026-05-20", times: ["AM"], sub: "Psychology A Level", title: "ADV PAPER 2" },
+    { date: "2026-05-20", times: ["PM"], sub: "Physics AS Level", title: "CORE PHYSICS II" },
+    { date: "2026-05-20", times: ["PM"], sub: "Physics A Level", title: "ADVANCED PHYSICS I" },
+    { date: "2026-05-20", times: ["PM"], sub: "Applied Science L3 Dip", title: "PHYSICS" },
+    { date: "2026-05-21", times: ["AM"], sub: "Politics A Level", title: "UK POLITICS" },
+    { date: "2026-05-21", times: ["AM"], sub: "Biology AS Level", title: "PAPER 2" },
+    { date: "2026-05-21", times: ["AM"], sub: "English GCSE", title: "PAPER 1" },
+    { date: "2026-05-21", times: ["AM", "PM"], sub: "Law A Level", title: "ADV PAPER 1" },
+    { date: "2026-05-21", times: ["PM"], sub: "Business AS Level", title: "MANAGING BUS. ACTIVITIES" },
+    { date: "2026-05-21", times: ["PM"], sub: "Geography A Level", title: "PAPER TWO" },
+    { date: "2026-05-21", times: ["PM"], sub: "Health & Social Care L3", title: "PRNCPLS HLTH SCL CARE" },
+    { date: "2026-05-22", times: ["AM", "PM"], sub: "English Lang/Lit A Level", title: "LANG PTRY & PLAYS" },
+    { date: "2026-05-22", times: ["AM"], sub: "Film Studies A Level", title: "Varieties of Film" },
+    { date: "2026-05-22", times: ["AM"], sub: "English Language A Level", title: "ADV PAPER 2" },
+    { date: "2026-05-22", times: ["PM"], sub: "Mathematics AS Level", title: "STATISTICS & MECHANICS" },
+    { date: "2026-06-01", times: ["AM"], sub: "English Literature A Level", title: "CMPRTVE & CNTXTL STDY" },
+    { date: "2026-06-01", times: ["AM"], sub: "Physics A Level", title: "ADVANCED PHYSICS II" },
+    { date: "2026-06-01", times: ["PM"], sub: "Law A Level", title: "ADV PAPER 2" },
+    { date: "2026-06-02", times: ["AM"], sub: "Chemistry A Level", title: "ADV PAPER 1" },
+    { date: "2026-06-02", times: ["AM"], sub: "Classical Civilisation A Level", title: "LOVE & RELATIONSHIPS" },
+    { date: "2026-06-02", times: ["AM"], sub: "Film Studies A Level", title: "Global Filmmaking" },
+    { date: "2026-06-02", times: ["PM"], sub: "History A Level", title: "CHINA & GDR" },
+    { date: "2026-06-03", times: ["AM", "PM"], sub: "Sociology A Level", title: "ADV PAPER 2" },
+    { date: "2026-06-03", times: ["AM"], sub: "Maths GCSE", title: "CALCULATOR (F) P2" },
+    { date: "2026-06-03", times: ["PM"], sub: "English Lang/Lit A Level", title: "RDNG WRTR WRTNG RDR" },
+    { date: "2026-06-03", times: ["PM"], sub: "Mathematics A Level", title: "PURE MATHEMATICS 1" },
+    { date: "2026-06-04", times: ["AM"], sub: "Spanish A Level", title: "LISTEN,READ.& TRANS" },
+    { date: "2026-06-04", times: ["AM"], sub: "Economics A Level", title: "ADV PAPER 3" },
+    { date: "2026-06-04", times: ["AM", "PM"], sub: "Biology A Level", title: "ADV PAPER 1" },
+    { date: "2026-06-04", times: ["PM"], sub: "Criminology L3 Dip", title: "Unit 4: Paper Based" },
+    { date: "2026-06-04", times: ["PM"], sub: "Media A Level", title: "Comp 2 Media Forms" },
+    { date: "2026-06-05", times: ["AM", "PM"], sub: "English GCSE", title: "PAPER 2" },
+    { date: "2026-06-05", times: ["AM"], sub: "Psychology A Level", title: "ADV PAPER 3" },
+    { date: "2026-06-05", times: ["AM"], sub: "Environmental Science A Level", title: "ADV PAPER 2" },
+    { date: "2026-06-08", times: ["AM"], sub: "Politics A Level", title: "UK GOVERNMENT" },
+    { date: "2026-06-08", times: ["AM"], sub: "Physics A Level", title: "PRINCIPLES IN PHYSICS" },
+    { date: "2026-06-08", times: ["AM"], sub: "Biology GCSE", title: "PAPER TWO(H)" },
+    { date: "2026-06-08", times: ["PM"], sub: "Music A Level", title: "APPRAISING" },
+    { date: "2026-06-08", times: ["PM"], sub: "Geography A Level", title: "PAPER THREE" },
+    { date: "2026-06-09", times: ["AM"], sub: "Law A Level", title: "ADV PAPER 3 OPT A" },
+    { date: "2026-06-09", times: ["AM"], sub: "Chemistry A Level", title: "ADV PAPER 2" },
+    { date: "2026-06-09", times: ["PM"], sub: "Business Studies A Level", title: "INVESTIGATING BUSINESS" },
+    { date: "2026-06-10", times: ["AM"], sub: "Maths GCSE", title: "CALCULATOR (F) P3" },
+    { date: "2026-06-10", times: ["PM"], sub: "Computer Science A Level", title: "ADV PAPER 1D PYTHON" },
+    { date: "2026-06-11", times: ["AM"], sub: "History A Level", title: "BRITAIN:EMPIRE & WAR" },
+    { date: "2026-06-11", times: ["AM"], sub: "Creative & Design T Level", title: "Media/Broadcast WRTN" },
+    { date: "2026-06-11", times: ["PM"], sub: "Mathematics A Level", title: "PURE MATHEMATICS 2" },
+    { date: "2026-06-12", times: ["AM", "PM"], sub: "Sociology A Level", title: "ADV PAPER 3" },
+    { date: "2026-06-12", times: ["AM"], sub: "Biology A Level", title: "ADV PAPER 2" },
+    { date: "2026-06-12", times: ["PM"], sub: "Spanish A Level", title: "WRIT. RESP. & TRANS" },
+    { date: "2026-06-15", times: ["AM"], sub: "Chemistry A Level", title: "ADV PAPER 3" },
+    { date: "2026-06-16", times: ["AM"], sub: "Biology A Level", title: "ADV PAPER 3" },
+    { date: "2026-06-16", times: ["PM"], sub: "Further Maths A Level", title: "DECISION MATHS.1" },
+    { date: "2026-06-16", times: ["PM"], sub: "Politics A Level", title: "COMPAR. POLITICS-GLOBAL" },
+    { date: "2026-06-17", times: ["AM"], sub: "Computer Science A Level", title: "ADV PAPER 2" },
+    { date: "2026-06-18", times: ["PM"], sub: "Mathematics A Level", title: "STATISTICS & MECHANICS" },
+    { date: "2026-06-19", times: ["PM"], sub: "Further Maths A Level", title: "FURTHER PURE MATHS.1" }
+];
+
+// Standard Pattern: 1, 2, 3, 5, 7 days before
+const REVISION_PATTERN = [1, 2, 3, 5, 7];
+
+// Paper Index shades: 0=Base, 1=20% Darker, 2=25% Lighter, 3=40% Darker
+const SHADE_OFFSETS = [0, -0.2, 0.25, -0.4, 0.45]; 
+
+const ORIGINAL_COLORS = [
+    '#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4', '#42d4f4', '#f032e6', '#bfef45', 
+    '#fabed4', '#469990', '#dcbeff', '#9a6324', '#800000', '#aaffc3', '#808000', '#ffd8b1', 
+    '#000075', '#a9a9a9', '#f06292', '#827717', '#1a237e', '#004d40', '#311b92', '#b71c1c'
+];
+
+const subjects = [...new Set(EXAM_DB.map(e => e.sub))].sort();
+let subjectColors = {};
+subjects.forEach((s, i) => subjectColors[s] = ORIGINAL_COLORS[i % ORIGINAL_COLORS.length]);
+
+// MOBILE TAP-TO-MOVE LOGIC
+let selectedItem = null;
+
+function handleSlotClick(slotElement) {
+    if (selectedItem) {
+        slotElement.appendChild(selectedItem);
+        selectedItem.classList.remove('selected');
+        selectedItem = null;
+        updateVisibleWeeks();
+        saveState();
+    }
+}
+
+function handleItemClick(event, itemElement) {
+    if (itemElement.classList.contains('exam')) return; 
+    
+    event.stopPropagation(); 
+    
+    if (selectedItem === itemElement) {
+        itemElement.classList.remove('selected');
+        selectedItem = null;
+    } else {
+        if (selectedItem) selectedItem.classList.remove('selected');
+        selectedItem = itemElement;
+        itemElement.classList.add('selected');
+    }
+}
+
+// BUILD UI
+const listDiv = document.getElementById('subjectList');
+subjects.forEach(s => {
+    const safeId = s.replace(/[^a-zA-Z0-9]/g, '-');
+    listDiv.innerHTML += `
+        <div class="sub-row">
+            <input type="checkbox" autocomplete="off" class="sub-checkbox" id="chk-${safeId}" value="${s}" onchange="toggleSubject('${s}', '${safeId}')">
+            <span class="color-lozenge" id="loz-${safeId}" style="background-color: ${subjectColors[s]};" 
+                  onclick="swapColor('${s}', this)" title="Tap to swap color"></span>
+            <label for="chk-${safeId}" title="${s}">${s}</label>
+        </div>`;
+});
+
+// --- ABBREVIATION ENGINE ---
+function getShortPaperName(title) {
+    const match = title.match(/PAPER\s*(\d|ONE|TWO|THREE)/i);
+    if(match) {
+        let num = match[1].toUpperCase();
+        if(num==='ONE') num='1'; if(num==='TWO') num='2'; if(num==='THREE') num='3';
+        return 'P' + num;
+    }
+    return title.split(' ')[0].substring(0, 6);
+}
+
+// --- COLOR SHADING ENGINE ---
+function shadeHexColor(hex, percent) {
+    if (!hex) return "#000000";
+    hex = hex.replace('#', '');
+    let r = parseInt(hex.substring(0, 2), 16);
+    let g = parseInt(hex.substring(2, 4), 16);
+    let b = parseInt(hex.substring(4, 6), 16);
+    
+    if (percent > 0) { 
+        r = Math.floor(r + (255 - r) * percent);
+        g = Math.floor(g + (255 - g) * percent);
+        b = Math.floor(b + (255 - b) * percent);
+    } else { 
+        r = Math.floor(r * (1 + percent)); 
+        g = Math.floor(g * (1 + percent));
+        b = Math.floor(b * (1 + percent));
+    }
+    return "#" + (1 << 24 | r << 16 | g << 8 | b).toString(16).slice(1);
+}
+
+function refreshAllSubjects() {
+    document.querySelectorAll('.item').forEach(el => {
+        const sub = el.getAttribute('data-sub');
+        const pIdx = parseInt(el.getAttribute('data-paper-index'));
+        const isShaded = document.getElementById('shadeToggle').checked;
+        const shadePercent = SHADE_OFFSETS[pIdx % SHADE_OFFSETS.length];
+        const color = isShaded ? shadeHexColor(subjectColors[sub], shadePercent) : subjectColors[sub];
+        el.style.backgroundColor = color;
+    });
+    saveState();
+}
+
+function swapColor(subject, lozEl) {
+    const unselected = Array.from(document.querySelectorAll('.sub-checkbox:not(:checked)'));
+    const valid = unselected.filter(cb => cb.value !== subject);
+
+    if (valid.length > 0) {
+        const randomCb = valid[Math.floor(Math.random() * valid.length)];
+        const swapSub = randomCb.value;
+        const swapId = swapSub.replace(/[^a-zA-Z0-9]/g, '-');
+        
+        const temp = subjectColors[subject];
+        subjectColors[subject] = subjectColors[swapSub];
+        subjectColors[swapSub] = temp;
+        
+        lozEl.style.backgroundColor = subjectColors[subject];
+        const swapLoz = document.getElementById(`loz-${swapId}`);
+        if (swapLoz) swapLoz.style.backgroundColor = subjectColors[swapSub];
+        
+        refreshAllSubjects();
+    } else {
+        alert("Leave at least one subject unchecked to swap colors!");
+    }
+}
+
+function initCalendar() {
+    const cal = document.getElementById('calendar');
+    const start = new Date("2026-04-20");
+    const end = new Date("2026-06-21");
+    let current = new Date(start);
+    let html = "";
+
+    while (current <= end) {
+        html += `<div class="week-grid" style="grid-template-columns: 60px repeat(7, 1fr);">
+            <div class="week-header">Week of ${current.toLocaleDateString('en-GB', {day:'numeric', month:'short'})}</div>
+            <div class="day-label">Time</div>`;
+            
+        for(let i=0; i<7; i++) {
+            let d = new Date(current); d.setDate(d.getDate() + i);
+            html += `<div class="day-label">${d.toLocaleDateString('en-GB', {weekday:'short', day:'numeric'})}</div>`;
+        }
+
+        ['AM', 'PM', 'Eve'].forEach(time => {
+            html += `<div class="time-col">${time}</div>`;
+            for(let i=0; i<7; i++) {
+                let d = new Date(current); d.setDate(d.getDate() + i);
+                let dateStr = d.toISOString().split('T')[0];
+                let isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                html += `<div class="slot ${isWeekend?'weekend':''}" id="slot-${dateStr}-${time}" 
+                             ondragover="event.preventDefault()" ondrop="drop(event)" onclick="handleSlotClick(this)"></div>`;
+            }
+        });
+        html += `</div>`;
+        current.setDate(current.getDate() + 7);
+    }
+    cal.innerHTML = html;
+    updateVisibleWeeks();
+}
+
+function updateVisibleWeeks() {
+    const weeks = Array.from(document.querySelectorAll('.week-grid'));
+    let firstVisible = -1;
+    let lastVisible = -1;
+    
+    weeks.forEach((w, i) => {
+        if(w.querySelector('.item')) {
+            if(firstVisible === -1) firstVisible = i;
+            lastVisible = i;
+        }
+    });
+    
+    let visibleCount = 0;
+    weeks.forEach((w, i) => {
+        w.classList.remove('print-page-break');
+        if((i >= firstVisible && i <= lastVisible) || (firstVisible === -1 && i < 2)) {
+            w.style.display = 'grid';
+            visibleCount++;
+            if(visibleCount % 2 === 0) w.classList.add('print-page-break');
+        } else {
+            w.style.display = 'none';
+        }
+    });
+}
+
+function getLeastCrowdedSlot(dateStr, preferred) {
+    let counts = { 'AM': 999, 'PM': 999, 'Eve': 999 };
+    let order = preferred === 'Eve' ? ['Eve', 'PM', 'AM'] : ['PM', 'Eve', 'AM'];
+    
+    order.forEach(s => {
+        const el = document.getElementById(`slot-${dateStr}-${s}`);
+        if (el) counts[s] = el.querySelectorAll('.item').length;
+    });
+    
+    let bestSlot = order[0];
+    let min = counts[bestSlot];
+    
+    for (let i = 1; i < 3; i++) {
+        if (counts[order[i]] < min) {
+            min = counts[order[i]];
+            bestSlot = order[i];
+        }
+    }
+    return bestSlot;
+}
+
+// --- SMART CLASH ENGINE ---
+function resolveClashesForDate(dateStr) {
+    const slots = {
+        'AM': document.getElementById(`slot-${dateStr}-AM`),
+        'PM': document.getElementById(`slot-${dateStr}-PM`)
+    };
+    
+    if (!slots['AM'] && !slots['PM']) return;
+
+    let domExams = [];
+    ['AM', 'PM'].forEach(t => {
+        if(!slots[t]) return;
+        Array.from(slots[t].querySelectorAll('.item.exam')).forEach(el => {
+            const sub = el.getAttribute('data-sub');
+            const pIdx = parseInt(el.getAttribute('data-paper-index'));
+            // Find the original data entry
+            const myExData = EXAM_DB.filter(e => e.sub === sub)[pIdx];
+            if(myExData) {
+                domExams.push({ el, data: myExData });
+                slots[t].removeChild(el); // Temporarily pull out of DOM
+            }
+        });
+    });
+
+    if (domExams.length === 0) return;
+
+    // Sort to place "Fixed" exams (only 1 time slot) first, "Flexible" (with reserves) second
+    domExams.sort((a, b) => a.data.times.length - b.data.times.length);
+    let occupied = { 'AM': false, 'PM': false };
+
+    domExams.forEach(item => {
+        let primary = item.data.times[0];
+        let alt = item.data.times.length > 1 ? item.data.times[1] : null;
+
+        // Strip existing clash warnings
+        const existingWarning = item.el.querySelector('.clash-warning');
+        if (existingWarning) existingWarning.remove();
+        item.el.style.border = '2px solid rgba(0,0,0,0.5)';
+        item.el.style.animation = 'none';
+
+        let assigned = primary;
+
+        if (!occupied[primary]) {
+            occupied[primary] = true;
+        } else if (alt && !occupied[alt]) {
+            occupied[alt] = true;
+            assigned = alt;
+            // Add moved badge
+            item.el.innerHTML = `<div class="clash-warning">⚠️ MOVED TO ${alt}</div>` + item.el.innerHTML;
+        } else {
+            // Unresolvable hard clash
+            occupied[primary] = true; 
+            item.el.innerHTML = `<div class="clash-warning">⚠️ HARD CLASH</div>` + item.el.innerHTML;
+            item.el.style.border = '3px solid #c0392b';
+            item.el.style.animation = 'pulse 1.5s infinite';
+        }
+
+        if(slots[assigned]) slots[assigned].appendChild(item.el);
+    });
+}
+
+function toggleSubject(sub, safeId) {
+    const isChecked = document.getElementById(`chk-${safeId}`).checked;
+    const modifiedDates = new Set();
+
+    if(isChecked) {
+        const myExams = EXAM_DB.filter(e => e.sub === sub);
+        
+        myExams.forEach((ex, index) => {
+            const shortPaper = getShortPaperName(ex.title);
+            // Temporarily place in primary slot, Engine will sort it out shortly
+            const exSlot = document.getElementById(`slot-${ex.date}-${ex.times[0]}`);
+            modifiedDates.add(ex.date);
+            
+            const isShaded = document.getElementById('shadeToggle').checked;
+            const shadePercent = SHADE_OFFSETS[index % SHADE_OFFSETS.length];
+            const blockColor = isShaded ? shadeHexColor(subjectColors[sub], shadePercent) : subjectColors[sub];
+            
+            if(exSlot) {
+                exSlot.innerHTML += `
+                    <div class="item exam" data-sub="${sub}" data-paper-index="${index}" style="background:${blockColor}">
+                        <div class="sub-title">⭐ ${sub}</div>
+                        <div class="paper-title">(${ex.title})</div>
+                    </div>`;
+            }
+            
+            // Generate Revision Blocks
+            REVISION_PATTERN.forEach(daysBack => {
+                let rd = new Date(ex.date); rd.setDate(rd.getDate() - daysBack);
+                let rStr = rd.toISOString().split('T')[0];
+                let preferred = (daysBack === 1) ? 'Eve' : 'PM';
+                let timeSlot = getLeastCrowdedSlot(rStr, preferred);
+                
+                const rSlot = document.getElementById(`slot-${rStr}-${timeSlot}`);
+                if(rSlot) {
+                    const id = `rev-${Math.random().toString(36).substr(2,9)}`;
+                    rSlot.innerHTML += `<div class="item revision" id="${id}" data-sub="${sub}" data-paper-index="${index}" draggable="true" ondragstart="drag(event)" onclick="handleItemClick(event, this)"
+                        style="background:${blockColor}">${sub} ${shortPaper}<br>(${daysBack}d)</div>`;
+                }
+            });
+        });
+    } else {
+        // Find dates that need to be re-evaluated for clashes when a subject is removed
+        document.querySelectorAll(`[data-sub="${sub}"]`).forEach(el => {
+            if(el.classList.contains('exam')) {
+                const parts = el.parentElement.id.split('-');
+                if(parts.length >= 4) modifiedDates.add(`${parts[1]}-${parts[2]}-${parts[3]}`);
+            }
+            el.remove();
+        });
+    }
+
+    // Run the clash resolution engine for affected days
+    modifiedDates.forEach(d => resolveClashesForDate(d));
+    
+    updateVisibleWeeks();
+    saveState();
+}
+
+function drag(ev) { 
+    ev.dataTransfer.setData("text", ev.target.id);
+    if(selectedItem) { selectedItem.classList.remove('selected'); selectedItem = null; } 
+}
+function drop(ev) {
+    ev.preventDefault();
+    const id = ev.dataTransfer.getData("text");
+    const el = document.getElementById(id);
+    if (el && ev.currentTarget.classList.contains('slot')) {
+        ev.currentTarget.appendChild(el);
+        updateVisibleWeeks();
+        saveState();
+    }
+}
+
+function saveState() {
+    const data = {
+        checks: Array.from(document.querySelectorAll('.sub-checkbox:checked')).map(i => i.value),
+        layout: document.getElementById('calendar').innerHTML,
+        colors: subjectColors,
+        shadeToggle: document.getElementById('shadeToggle').checked
+    };
+    localStorage.setItem('examPlan2026_V8', JSON.stringify(data));
+}
+
+function loadState() {
+    const saved = localStorage.getItem('examPlan2026_V8');
+    if(!saved) { updateVisibleWeeks(); return; }
+    
+    const data = JSON.parse(saved);
+    if(data.colors) {
+        subjectColors = data.colors;
+        subjects.forEach(s => {
+            const safeId = s.replace(/[^a-zA-Z0-9]/g, '-');
+            const loz = document.getElementById(`loz-${safeId}`);
+            if(loz) loz.style.backgroundColor = subjectColors[s];
+        });
+    }
+    
+    if(data.shadeToggle !== undefined) {
+        document.getElementById('shadeToggle').checked = data.shadeToggle;
+    }
+
+    document.getElementById('calendar').innerHTML = data.layout;
+    
+    document.querySelectorAll('.revision').forEach(el => {
+        el.draggable = true;
+        el.ondragstart = drag;
+        el.onclick = function(e) { handleItemClick(e, this); };
+    });
+
+    data.checks.forEach(c => {
+        const safeId = c.replace(/[^a-zA-Z0-9]/g, '-');
+        const chk = document.getElementById(`chk-${safeId}`);
+        if(chk) chk.checked = true;
+    });
+    
+    updateVisibleWeeks();
+}
+
+function clearPlan() {
+    if(confirm("Are you sure you want to start over?")) {
+        localStorage.removeItem('examPlan2026_V8');
+        document.querySelectorAll('.sub-checkbox').forEach(cb => cb.checked = false);
+        window.location.reload();
+    }
+}
+
+initCalendar();
+loadState();
+</script>
+</body>
+</html>

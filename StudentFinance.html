@@ -1,0 +1,354 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Financial Literacy Prompts</title>
+
+<style>
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+        font-family: Arial, sans-serif;
+        background: #f7f9fc;
+        margin: 0;
+        text-align: center;
+    }
+
+    /* Header */
+    header {
+        background: #003b73;
+        color: white;
+        padding: 15px;
+        font-size: 1.1rem;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
+    }
+    header div {
+        padding: 6px 12px;
+        border-radius: 6px;
+        background: rgba(255,255,255,0.2);
+    }
+    .active-section {
+        background: #ffcc33;
+        color: #003b73;
+        font-weight: bold;
+    }
+
+    /* Content */
+    .content {
+        max-width: 900px;
+        margin: 35px auto;
+        padding: 20px;
+        position: relative;
+        z-index: 1;
+    }
+
+    .question {
+        font-size: 2rem;
+        margin-bottom: 20px;
+        min-height: 3.5em;
+        opacity: 0;
+        transition: opacity .6s ease; /* fade */
+    }
+    .question.show {
+        opacity: 1;
+    }
+
+    /* Buttons */
+    .controls { 
+        display: flex; 
+        flex-wrap: wrap; 
+        gap: 10px; 
+        justify-content: center; 
+        margin-bottom: 10px; 
+    }
+    button {
+        padding: 12px 22px;
+        font-size: 1.05rem;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+    #feedbackBtn { background: #0078D4; color: #fff; }
+    #nextBtn     { background: #555;   color: #fff; display: none; }
+    #backBtn     { background: #6c757d; color: #fff; display: none; }
+    #restartBtn  { background: #e67e22; color: #fff; display: none; }
+
+    /* Links panel */
+    .links {
+        display: none;
+        background: #eef4fb;
+        border-radius: 10px;
+        padding: 20px;
+        text-align: left;
+        max-width: 650px;
+        margin: 16px auto 0 auto;
+
+        opacity: 0;                    /* fade */
+        transition: opacity .5s ease;  /* fade */
+        position: relative;
+        z-index: 9999;
+        pointer-events: auto;
+    }
+    .links.show {
+        opacity: 1;
+    }
+
+    .link-item {
+        background: #fff;
+        padding: 15px;
+        margin-bottom: 15px;
+        border-left: 6px solid #0078D4;
+        border-radius: 5px;
+    }
+    .link-title { font-weight: bold; margin-bottom: 6px; }
+    .link-desc  { font-size: 0.95rem; color: #333; margin-bottom: 10px; }
+
+    a.link-button {
+        display: inline-block;
+        padding: 10px 20px;
+        background: #0078D4;
+        color: white;
+        text-decoration: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+
+    .progress { margin-top: 12px; color: #555; font-size: 0.95rem; }
+</style>
+</head>
+
+<body>
+
+<header id="headerBar">
+    <div>Experience With Money</div>
+    <div>Banking & Budgeting</div>
+    <div>Spending & Saving</div>
+    <div>Bills & Real‑World Costs</div>
+    <div>Credit & Debt</div>
+    <div>Money Skills & Confidence</div>
+</header>
+
+<div class="content">
+    <div id="question" class="question"></div>
+
+    <div class="controls">
+        <button id="backBtn">Back</button>
+        <button id="feedbackBtn">Resources</button>
+        <button id="nextBtn">Next Question</button>
+        <button id="restartBtn">Restart</button>
+    </div>
+
+    <div id="links" class="links"></div>
+
+    <div id="progress" class="progress"></div>
+</div>
+
+<script>
+/* ——————————  DATA (unchanged) —————————— */
+var questions = [
+    {
+        section: "Experience With Money",
+        q: "How do you usually get your money? (e.g., part-time job, allowance, gifts)",
+        links: [
+            { title: "MoneyHelper 16–24 Guide", desc: "How to manage money as a young adult.", url: "https://www.moneyhelper.org.uk/en/family-and-care/student-and-graduate-money/supporting-yourself-financially-a-guide-for-young-adults-aged-16-to-24" },
+            { title: "Barclays LifeSkills 16–19", desc: "Advice on earning and budgeting.", url: "https://barclayslifeskills.com/help-others/schemes-of-learning/financial-education/16-19/" }
+        ]
+    },
+    {
+        section: "Experience With Money",
+        q: "Do you prefer using cash, card, or mobile payments — and why?",
+        links: [
+            { title: "Lloyds Bank Academy", desc: "Safe digital banking & payment security.", url: "https://www.lloydsbankacademy.co.uk/financial-skills/sixteen-plus.html" },
+            { title: "MoneySavingExpert – Money Skills", desc: "Explains payment methods & online safety.", url: "https://www.moneysavingexpert.com/family/financial-education/" }
+        ]
+    },
+    {
+        section: "Banking & Budgeting",
+        q: "Do you currently have a bank account? What do you use it for?",
+        links: [
+            { title: "Lloyds Bank Academy", desc: "Understanding account types & overdrafts.", url: "https://www.lloydsbankacademy.co.uk/financial-skills/sixteen-plus.html" }
+        ]
+    },
+    {
+        section: "Banking & Budgeting",
+        q: "Have you ever set a budget? How do you keep track of it?",
+        links: [
+            { title: "MoneyHelper Budgeting", desc: "How to create & track a budget.", url: "https://www.moneyhelper.org.uk/en/blog/young-people/guide-to-setting-up-and-managing-student-bills" },
+            { title: "Barclays LifeSkills", desc: "Tools to build budgeting confidence.", url: "https://barclayslifeskills.com/help-others/schemes-of-learning/financial-education/16-19/" }
+        ]
+    },
+    {
+        section: "Spending & Saving",
+        q: "What do you spend most of your money on each month?",
+        links: [
+            { title: "MoneySavingExpert: Spending", desc: "Tips for controlling spending.", url: "https://www.moneysavingexpert.com/family/financial-education/" }
+        ]
+    },
+    {
+        section: "Spending & Saving",
+        q: "Do you save regularly? How do you decide how much to save?",
+        links: [
+            { title: "Lloyds Bank Academy: Saving", desc: "Setting and maintaining saving goals.", url: "https://www.lloydsbankacademy.co.uk/financial-skills/sixteen-plus.html" }
+        ]
+    },
+    {
+        section: "Bills & Real‑World Costs",
+        q: "What bills do young adults typically pay each month?",
+        links: [
+            { title: "MoneyHelper: Student Bills", desc: "Overview of typical living costs.", url: "https://www.moneyhelper.org.uk/en/blog/young-people/guide-to-setting-up-and-managing-student-bills" },
+            { title: "Save The Student: Bills Guide", desc: "How to manage & reduce bills.", url: "https://www.savethestudent.org/accommodation/guide-to-student-energy-bills.html" }
+        ]
+    },
+    {
+        section: "Bills & Real‑World Costs",
+        q: "What do you know about renting a flat or house?",
+        links: [
+            { title: "Citizens Advice: Renting", desc: "Understanding contracts & rights.", url: "https://www.citizensadvice.org.uk/housing/" },
+            { title: "GOV.UK Renters' Rights Act", desc: "Government guide to tenant rights.", url: "https://www.gov.uk/government/publications/guide-to-the-renters-rights-act/guide-to-the-renters-rights-act" }
+        ]
+    },
+    {
+        section: "Bills & Real‑World Costs",
+        q: "What is involved in paying for utilities (gas, electricity, internet)?",
+        links: [
+            { title: "UniGuide: Energy Setup", desc: "Setting up energy accounts.", url: "https://www.theuniguide.co.uk/advice/student-accommodation/student-survival-guide-electricity-and-gas-bills" },
+            { title: "GOV.UK: Student Council Tax", desc: "When students must pay council tax.", url: "https://www.gov.uk/council-tax/discounts-for-full-time-students" }
+        ]
+    },
+    {
+        section: "Credit & Debt",
+        q: "What worries or questions do you have about debt or borrowing?",
+        links: [
+            { title: "National Debtline", desc: "Free, confidential debt advice.", url: "https://nationaldebtline.org/" },
+            { title: "MoneySavingExpert – Debt", desc: "Student-friendly guide to debt.", url: "https://www.moneysavingexpert.com/family/financial-education/" }
+        ]
+    },
+    {
+        section: "Credit & Debt",
+        q: "What big expenses do you think you'll face in the next 5 years? (e.g., car, rent, university)",
+        links: [
+            { title: "MoneyHelper 16–24 Guide", desc: "Planning ahead for major costs.", url: "https://www.moneyhelper.org.uk/en/family-and-care/student-and-graduate-money/supporting-yourself-financially-a-guide-for-young-adults-aged-16-to-24" }
+        ]
+    },
+    {
+        section: "Money Skills & Confidence",
+        q: "What financial topics or skills would you like to learn more about?",
+        links: [
+            { title: "Young Enterprise: Your Money Matters", desc: "Free student money textbook.", url: "https://www.young-enterprise.org.uk/what-we-do/resources/your-money-matters" },
+            { title: "Words That Count", desc: "Build money vocabulary & confidence.", url: "https://literacytrust.org.uk/programmes/sport-and-literacy/words-that-count/" }
+        ]
+    }
+];
+
+/* ——————————  STATE —————————— */
+var index = 0;
+var revealed = new Array(questions.length).fill(false);
+
+/* ——————————  HELPERS —————————— */
+function highlightSection(sectionName) {
+    document.querySelectorAll("#headerBar div").forEach(div => {
+        div.classList.toggle("active-section", div.textContent.trim() === sectionName);
+    });
+}
+
+function updateProgress() {
+    document.getElementById("progress").textContent =
+        "Question " + (index + 1) + " of " + questions.length;
+}
+
+function fadeIn(element) {
+    element.classList.remove("show");
+    void element.offsetWidth; /* force reflow */
+    element.classList.add("show");
+}
+
+/* ——————————  RENDER QUESTION —————————— */
+function renderQuestion() {
+    var q = questions[index];
+    highlightSection(q.section);
+    updateProgress();
+
+    var qDiv = document.getElementById("question");
+    qDiv.textContent = q.q;
+    fadeIn(qDiv);
+
+    var linksDiv = document.getElementById("links");
+    linksDiv.innerHTML = "";
+    linksDiv.classList.remove("show");
+    linksDiv.style.display = "none";
+
+    document.getElementById("backBtn").style.display = revealed[index] ? "inline-block" : "none";
+    document.getElementById("nextBtn").style.display = revealed[index] ? "inline-block" : "none";
+
+    document.getElementById("restartBtn").style.display = "none";
+    document.getElementById("feedbackBtn").style.display = "inline-block";
+
+    if (revealed[index]) buildAndShowLinks();
+}
+
+/* ——————————  LINKS —————————— */
+function buildAndShowLinks() {
+    var q = questions[index];
+    var linksDiv = document.getElementById("links");
+
+    linksDiv.innerHTML = q.links.map(link =>
+        '<div class="link-item">' +
+            '<div class="link-title">' + link.title + '</div>' +
+            '<div class="link-desc">' + link.desc + '</div>' +
+            '<a class="link-button" href="' + link.url + '" target="_blank" rel="noopener">Open Resource</a>' +
+        '</div>'
+    ).join("");
+
+    linksDiv.style.display = "block";
+    fadeIn(linksDiv);
+
+    document.getElementById("backBtn").style.display = "inline-block";
+    document.getElementById("nextBtn").style.display = "inline-block";
+}
+
+/* ——————————  BUTTON HANDLERS —————————— */
+document.getElementById("feedbackBtn").addEventListener("click", () => {
+    revealed[index] = true;
+    buildAndShowLinks();
+    document.getElementById("feedbackBtn").style.display = "none";
+});
+
+document.getElementById("nextBtn").addEventListener("click", () => {
+    index++;
+    if (index >= questions.length) {
+        document.getElementById("question").textContent = "All questions completed!";
+        document.getElementById("feedbackBtn").style.display = "none";
+        document.getElementById("nextBtn").style.display = "none";
+        document.getElementById("backBtn").style.display = "inline-block";
+        document.getElementById("links").style.display = "none";
+        document.getElementById("progress").textContent = "";
+
+        document.getElementById("restartBtn").style.display = "inline-block";
+        return;
+    }
+    renderQuestion();
+});
+
+document.getElementById("backBtn").addEventListener("click", () => {
+    if (index > 0) {
+        index--;
+        renderQuestion();
+    }
+});
+
+document.getElementById("restartBtn").addEventListener("click", () => {
+    index = 0;
+    revealed.fill(false);
+    renderQuestion();
+});
+
+/* Init */
+renderQuestion();
+</script>
+
+</body>
+</html>

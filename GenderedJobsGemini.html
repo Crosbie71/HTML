@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Title Bias Experiment</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --accent: #7c3aed;
+            --bg: #f1f5f9;
+            --text: #0f172a;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        #app-container {
+            width: 90%;
+            max-width: 900px;
+            text-align: center;
+            padding-top: 5vh;
+        }
+
+        /* Flashcard Style */
+        #display-card {
+            background: white;
+            height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 5rem;
+            font-weight: 800;
+            border-radius: 24px;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+            transition: transform 0.2s;
+        }
+
+        .controls button {
+            padding: 12px 24px;
+            font-size: 1.1rem;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            background: var(--primary);
+            color: white;
+            margin: 0 5px;
+            transition: opacity 0.2s;
+        }
+
+        button:disabled { background: #94a3b8; cursor: not-allowed; }
+
+        /* Progress Bar */
+        .progress-box { width: 100%; height: 10px; background: #e2e8f0; border-radius: 5px; margin: 20px 0; overflow: hidden; }
+        #bar { height: 100%; width: 0%; background: var(--primary); transition: width 0.3s; }
+
+        /* Analysis Grid */
+        #analysis-section {
+            display: none;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 15px;
+            margin-top: 40px;
+            padding-bottom: 50px;
+        }
+
+        .word-pill {
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            font-weight: 600;
+        }
+
+        .word-pill.revealed { border-color: var(--accent); }
+        .category-label {
+            display: block;
+            font-size: 0.7rem;
+            color: var(--accent);
+            text-transform: uppercase;
+            margin-top: 5px;
+            opacity: 0;
+        }
+        .revealed .category-label { opacity: 1; }
+
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+<div id="app-container">
+    <div id="display-card">Click Start</div>
+
+    <div class="progress-box"><div id="bar"></div></div>
+    <div id="counter">0 / 40</div>
+
+    <div class="controls">
+        <button id="prevBtn" onclick="change(-1)">Back</button>
+        <button id="nextBtn" onclick="change(1)">Start / Next</button>
+        <button onclick="location.reload()" style="background:#64748b">Reset</button>
+        <button id="revealBtn" class="hidden" onclick="showAnalysis()" style="background:var(--accent)">Reveal Analysis</button>
+    </div>
+
+    <div id="analysis-section"></div>
+</div>
+
+<script>
+    const data = [
+        {w: "Waitress", c: "Gender-Marked (Fem)"}, {w: "Server", c: "Neutral Replacement"},
+        {w: "Headmaster", c: "Gender-Marked (Masc)"}, {w: "Headteacher", c: "Neutral Replacement"},
+        {w: "Air Stewardess", c: "Gender-Marked (Fem)"}, {w: "Flight Attendant", c: "Neutral Replacement"},
+        {w: "Maid", c: "Gender-Marked (Fem)"}, {w: "Housekeeper", c: "Neutral Replacement"},
+        {w: "Postman", c: "Gender-Marked (Masc)"}, {w: "Postal Worker", c: "Neutral Replacement"},
+        {w: "Landlady", c: "Gender-Marked (Fem)"}, {w: "Property Manager", c: "Neutral Replacement"},
+        {w: "Nurse", c: "Unmarked / Fem-Biased"}, {w: "Surgeon", c: "Unmarked / Masc-Biased"},
+        {w: "Secretary", c: "Unmarked / Fem-Biased"}, {w: "Administrative Assistant", c: "Neutral Replacement"},
+        {w: "Chef", c: "Unmarked / Masc-Biased"}, {w: "Cook", c: "Unmarked / Fem-Biased"},
+        {w: "Prostitute", c: "Unmarked / Fem-Biased"}, {w: "Sex Worker", c: "Modern Neutral"},
+        {w: "Pilot", c: "Unmarked / Masc-Biased"}, {w: "Nanny", c: "Unmarked / Fem-Biased"},
+        {w: "Soldier", c: "Unmarked / Masc-Biased"}, {w: "Social Worker", c: "Unmarked / Fem-Biased"},
+        {w: "Mechanic", c: "Unmarked / Masc-Biased"}, {w: "Beautician", c: "Unmarked / Fem-Biased"},
+        {w: "CEO", c: "Unmarked / Masc-Biased"}, {w: "Midwife", c: "Unmarked / Fem-Biased"},
+        {w: "Professor", c: "Variable / High Status"}, {w: "Lecturer", c: "Variable / Neutral"},
+        {w: "Doctor", c: "Variable / Neutral"}, {w: "Scientist", c: "Variable / Neutral"},
+        {w: "Artist", c: "Variable / Neutral"}, {w: "Farmer", c: "Unmarked / Masc-Biased"},
+        {w: "Builder", c: "Unmarked / Masc-Biased"}, {w: "Cleaner", c: "Unmarked / Fem-Biased"},
+        {w: "Politician", c: "Variable / Neutral"}, {w: "Psychologist", c: "Variable / Fem-Biased"},
+        {w: "Firefighter", c: "Neutral Replacement"}, {w: "Police Officer", c: "Neutral Replacement"}
+    ];
+
+    let list = [...data].sort(() => Math.random() - 0.5);
+    let index = -1;
+
+    function change(dir) {
+        index += dir;
+        if (index < 0) index = 0;
+        if (index >= list.length) {
+            document.getElementById('revealBtn').classList.remove('hidden');
+            return;
+        }
+        update();
+    }
+
+    function update() {
+        document.getElementById('display-card').innerText = list[index].w;
+        document.getElementById('bar').style.width = ((index + 1) / list.length * 100) + "%";
+        document.getElementById('counter').innerText = `${index + 1} / ${list.length}`;
+        document.getElementById('prevBtn').disabled = index <= 0;
+    }
+
+    function showAnalysis() {
+        const grid = document.getElementById('analysis-section');
+        grid.style.display = 'grid';
+        grid.innerHTML = '';
+        // Sort alphabetically for the final reveal
+        const sorted = [...data].sort((a,b) => a.w.localeCompare(b.w));
+        sorted.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'word-pill';
+            div.innerHTML = `${item.w}<span class="category-label">${item.c}</span>`;
+            div.onclick = () => div.classList.toggle('revealed');
+            grid.appendChild(div);
+        });
+        window.scrollTo({ top: grid.offsetTop, behavior: 'smooth' });
+    }
+</script>
+</body>
+</html>

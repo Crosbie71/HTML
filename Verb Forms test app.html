@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>English Verb Form Practice</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 2rem;
+      background-color: #f4f4f4;
+      text-align: center;
+    }
+    h1 {
+      margin-bottom: 1.5rem;
+    }
+    .card {
+      background: white;
+      padding: 1.5rem;
+      margin: 1rem auto;
+      width: 80%;
+      max-width: 700px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      font-size: 1.5rem;
+    }
+    button {
+      margin-top: 2rem;
+      font-size: 1.2rem;
+      padding: 0.6rem 1.2rem;
+      border: none;
+      border-radius: 6px;
+      background-color: #333;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #555;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Verb Form Practice</h1>
+
+<div class="card" id="sentence">Click the button to begin</div>
+<div class="card" id="question">Click the button to begin</div>
+
+<button onclick="generatePair()">Next</button>
+
+<script>
+  const sentences = [
+    "I run every morning.",
+    "She has finished her homework.",
+    "They were playing football.",
+    "He will arrive tomorrow.",
+    "We had eaten before the show.",
+    "I am reading a book.",
+    "You spoke to her yesterday.",
+    "The cake was baked by Anna.",
+    "She is going to travel next week.",
+    "They have been working all day.",
+    "I had finished before he called.",
+    "We walk to school every day.",
+    "He has been waiting here.",
+    "The letter was sent yesterday.",
+    "I will be singing at 8 PM."
+  ];
+
+  const questions = [
+    "What is the auxiliary verb, if any?",
+    "Identify the tense of the main verb phrase.",
+    "Is there a past participle in the verb phrase?",
+    "Is the verb phrase simple?",
+    "Does this sentence contain an auxiliary verb?",
+    "What voice is this sentence in?",
+    "What is the main verb?",
+    "What is the form of the main verb?",
+    "What tense and aspect does this express?",
+    "How many auxiliaries are in the verb phrase?"
+  ];
+
+  function getRandom(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  function generatePair() {
+    document.getElementById('sentence').textContent = getRandom(sentences);
+    document.getElementById('question').textContent = getRandom(questions);
+  }
+</script>
+
+</body>
+</html>

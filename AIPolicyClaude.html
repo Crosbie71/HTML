@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body, html {
+    margin: 0; padding: 0; width: 100%; height: 100vh;
+    overflow: hidden; background: #f4f5f7;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 20px;
+    display: flex; flex-direction: column;
+  }
+  #header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 22px; border-bottom: 1px solid #e2e5ea;
+    background: #fff; flex-shrink: 0; gap: 12px;
+  }
+  #header h1 { margin:0; font-size:1.2rem; color:#111; white-space:nowrap; }
+  #header p  { margin:0; font-size:.82rem; color:#6b7280; }
+  .hdr-right { display:flex; gap:8px; align-items:center; flex-shrink:0; }
+  .pill-toggle { display:flex; border:1.5px solid #e2e5ea; border-radius:9px; overflow:hidden; }
+  .pill-btn { padding:6px 15px; font-size:.82rem; font-weight:600; cursor:pointer; border:none; background:#fff; color:#6b7280; transition:all .15s; }
+  .pill-btn.active { background:#1d4ed8; color:#fff; }
+  .hdr-btn { padding:6px 13px; border-radius:8px; border:1.5px solid #e2e5ea; font-size:.78rem; font-weight:600; cursor:pointer; background:#fff; color:#6b7280; white-space:nowrap; }
+  .hdr-btn:hover { border-color:#1d4ed8; color:#1d4ed8; }
+  .hdr-btn.danger:hover { border-color:#ef4444; color:#ef4444; }
+  .hdr-btn.export { border-color:#059669; color:#059669; }
+  .hdr-btn.export:hover { background:#f0fdf4; }
+
+  #main { display:flex; flex:1; overflow:hidden; }
+  #canvas-wrap { flex:1; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
+  #map { position:relative; }
+
+  .box {
+    position:absolute; background:#fff; border:3px solid #d1d5db; border-radius:14px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+    font-weight:700; font-size:1.1rem; cursor:pointer; user-select:none; z-index:10;
+    transition:border-color .15s, box-shadow .15s, transform .15s, opacity .15s;
+  }
+  .box:hover { transform:scale(1.03); }
+  .box .hint { font-size:.65rem; font-weight:500; color:#a78bfa; display:none; }
+  .box.type-manager { border-color:#7c3aed; color:#7c3aed; }
+  .box.type-teacher  { border-color:#0891b2; color:#0891b2; }
+  .box.type-student  { border-color:#059669; color:#059669; }
+  .box.type-home     { border-color:#d97706; color:#d97706; }
+  .box.box-first { box-shadow:0 0 0 5px rgba(124,58,237,.4); transform:scale(1.06); }
+  .box.box-first .hint { display:block; }
+  .box.pair-hi  { box-shadow:0 0 0 5px rgba(124,58,237,.25); }
+  .box.focus-hi { box-shadow:0 0 0 5px rgba(29,78,216,.2); }
+  .box.faded { opacity:.28; }
+
+  svg { position:absolute; inset:0; overflow:visible; pointer-events:none; z-index:1; }
+  .line { stroke:#d1d5db; stroke-width:7; fill:none; pointer-events:stroke; cursor:pointer; transition:stroke .15s,opacity .15s; }
+  .line:hover { stroke:#93c5fd; }
+  .line.faded      { opacity:.1; pointer-events:none; }
+  .line.hi-blue    { stroke:#1d4ed8 !important; stroke-width:8; opacity:1 !important; }
+  .line.hi-purple  { stroke:#7c3aed !important; stroke-width:8; opacity:1 !important; }
+  .line.hi-gray    { stroke:#9ca3af !important; stroke-width:5; opacity:.55 !important; stroke-dasharray:7 5; }
+  .line.policy-ok   { stroke:#16a34a; }
+  .line.policy-cond { stroke:#f59e0b; stroke-dasharray:12 6; }
+  .line.policy-no   { stroke:#ef4444; stroke-dasharray:5 5; opacity:.7; }
+  .arrow { fill:#d1d5db; pointer-events:none; transition:fill .15s,opacity .15s; }
+  .arrow.faded     { opacity:.1; }
+  .arrow.hi-blue   { fill:#1d4ed8 !important; opacity:1 !important; }
+  .arrow.hi-purple { fill:#7c3aed !important; opacity:1 !important; }
+  .arrow.hi-gray   { fill:#9ca3af !important; opacity:.55 !important; }
+  .arrow.policy-ok   { fill:#16a34a; }
+  .arrow.policy-cond { fill:#f59e0b; }
+  .arrow.policy-no   { fill:#ef4444; opacity:.7; }
+
+  .ai-badge {
+    position:absolute; z-index:20; border-radius:50%; width:26px; height:26px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:.75rem; cursor:pointer; border:2px solid #fff;
+    transform:translate(-50%,-50%); transition:transform .15s;
+  }
+  .ai-badge:hover { transform:translate(-50%,-50%) scale(1.25); }
+  .ai-badge.policy-ok   { background:#16a34a; box-shadow:0 2px 8px rgba(22,163,74,.4); }
+  .ai-badge.policy-cond { background:#f59e0b; box-shadow:0 2px 8px rgba(245,158,11,.4); }
+  .ai-badge.policy-no   { background:#ef4444; box-shadow:0 2px 8px rgba(239,68,68,.4); }
+
+  /* ── Panel ── */
+  #panel { width:320px; flex-shrink:0; background:#fff; border-left:1px solid #e2e5ea; display:flex; flex-direction:column; overflow:hidden; }
+
+  #welcome { flex:1; padding:22px 20px; display:flex; flex-direction:column; gap:12px; overflow-y:auto; }
+  #welcome h2 { margin:0; font-size:1rem; color:#111; }
+  .tip { border-radius:10px; padding:11px 13px; font-size:.85rem; line-height:1.55; }
+  .tip.blue   { background:#eff6ff; color:#1d4ed8; }
+  .tip.purple { background:#f5f3ff; color:#7c3aed; }
+  .tip.gray   { background:#f9fafb; color:#4b5563; }
+  #welcome p  { margin:0; font-size:.78rem; color:#9ca3af; line-height:1.6; }
+
+  #editor { flex:1; display:none; flex-direction:column; overflow:hidden; }
+  #ed-header { padding:14px 18px 10px; border-bottom:1px solid #f0f0f0; flex-shrink:0; }
+  #ed-mode-tag { display:inline-block; font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; padding:3px 8px; border-radius:20px; margin-bottom:6px; }
+  #ed-mode-tag.single { background:#eff6ff; color:#1d4ed8; }
+  #ed-mode-tag.pair   { background:#f5f3ff; color:#7c3aed; }
+  #ed-title { font-size:1.05rem; font-weight:700; color:#111; line-height:1.35; }
+  #ed-sub   { font-size:.78rem; color:#9ca3af; margin-top:3px; min-height:1.1em; }
+
+  #ed-body { flex:1; overflow-y:auto; padding:14px 18px; display:flex; flex-direction:column; gap:14px; }
+  .ed-section-label { font-size:.72rem; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:.05em; margin-bottom:5px; }
+
+  .stance-row { display:flex; gap:7px; }
+  .stance-btn { flex:1; padding:8px 3px; border-radius:9px; border:1.5px solid #e2e5ea; font-size:.78rem; font-weight:700; cursor:pointer; text-align:center; transition:all .15s; background:#fff; }
+  .stance-btn.ok   { border-color:#16a34a; color:#16a34a; }
+  .stance-btn.cond { border-color:#f59e0b; color:#d97706; }
+  .stance-btn.no   { border-color:#ef4444; color:#ef4444; }
+  .stance-btn.ok.active   { background:#16a34a; color:#fff; }
+  .stance-btn.cond.active { background:#f59e0b; color:#fff; }
+  .stance-btn.no.active   { background:#ef4444; color:#fff; }
+
+  .prompt-box { background:#f8faff; border:1.5px solid #bfdbfe; border-radius:10px; padding:11px 13px; font-size:.85rem; color:#1e40af; line-height:1.6; font-style:italic; }
+  .prompt-actions { display:flex; gap:6px; margin-top:6px; }
+  .prompt-edit-btn { font-size:.72rem; padding:4px 9px; border-radius:6px; border:1.5px solid #bfdbfe; background:#fff; color:#1d4ed8; cursor:pointer; font-weight:600; }
+  .prompt-edit-btn:hover { background:#eff6ff; }
+  textarea.prompt-ta { width:100%; border:1.5px solid #bfdbfe; border-radius:9px; padding:9px 11px; font-size:.85rem; resize:none; outline:none; font-family:inherit; color:#1e40af; line-height:1.55; background:#f8faff; display:none; }
+  textarea.prompt-ta:focus { border-color:#1d4ed8; }
+
+  #ed-notes { width:100%; border:1.5px solid #e2e5ea; border-radius:9px; padding:8px 10px; font-size:.85rem; resize:none; outline:none; font-family:inherit; color:#374151; line-height:1.55; }
+  #ed-notes:focus { border-color:#a5b4fc; }
+
+  #ed-footer { padding:10px 18px 13px; border-top:1px solid #f0f0f0; display:flex; gap:7px; flex-shrink:0; }
+  .ed-btn { flex:1; padding:9px; border-radius:9px; border:none; font-size:.82rem; font-weight:700; cursor:pointer; transition:all .15s; }
+  .ed-btn.save  { background:#1d4ed8; color:#fff; }
+  .ed-btn.save:hover { background:#1e40af; }
+  .ed-btn.clear { background:#fee2e2; color:#ef4444; }
+  .ed-btn.clear:hover { background:#fecaca; }
+  .ed-btn.close { background:#f3f4f6; color:#374151; }
+
+  #log-section { border-top:1px solid #f0f0f0; flex-shrink:0; max-height:230px; display:flex; flex-direction:column; }
+  #log-header { padding:8px 18px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0; }
+  #log-header h3 { margin:0; font-size:.85rem; color:#111; }
+  #log-count { font-size:.75rem; color:#9ca3af; }
+  #log-list { overflow-y:auto; padding:4px 14px 10px; display:flex; flex-direction:column; gap:6px; }
+  #log-empty { font-size:.78rem; color:#9ca3af; text-align:center; padding:10px 0 6px; }
+  .log-card { border-radius:9px; padding:8px 11px; font-size:.78rem; position:relative; border:1.5px solid; cursor:pointer; }
+  .log-card:hover { opacity:.85; }
+  .log-card.policy-ok   { background:#f0fdf4; border-color:#86efac; }
+  .log-card.policy-cond { background:#fffbeb; border-color:#fcd34d; }
+  .log-card.policy-no   { background:#fff1f1; border-color:#fca5a5; }
+  .log-card .lc-label  { font-weight:700; color:#1f2937; padding-right:18px; }
+  .log-card .lc-stance { font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; margin-top:2px; }
+  .log-card.policy-ok   .lc-stance { color:#16a34a; }
+  .log-card.policy-cond .lc-stance { color:#d97706; }
+  .log-card.policy-no   .lc-stance { color:#ef4444; }
+  .log-card .lc-note { color:#6b7280; margin-top:3px; font-style:italic; line-height:1.4; font-size:.75rem; }
+  .log-card .lc-rm { position:absolute; top:6px; right:9px; cursor:pointer; color:#d1d5db; font-size:.78rem; }
+  .log-card .lc-rm:hover { color:#ef4444; }
+
+  #legend { padding:8px 18px 11px; border-top:1px solid #f0f0f0; display:flex; gap:10px; flex-wrap:wrap; flex-shrink:0; }
+  .leg { display:flex; align-items:center; gap:5px; font-size:.72rem; color:#6b7280; }
+  .leg-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+</style>
+</head>
+<body>
+<div id="header">
+  <div><h1>AI Policy Discussion Map</h1><p>Where should AI intervene — and how?</p></div>
+  <div class="hdr-right">
+    <div class="pill-toggle">
+      <button class="pill-btn active" data-aud="staff"    onclick="setAudience('staff')">Staff</button>
+      <button class="pill-btn"        data-aud="students" onclick="setAudience('students')">Students</button>
+    </div>
+    <button class="hdr-btn export" onclick="exportCSV()">⬇ CSV</button>
+    <button class="hdr-btn danger" onclick="doResetAll()">Reset</button>
+  </div>
+</div>
+
+<div id="main">
+  <div id="canvas-wrap"><div id="map"><svg id="svg"></svg></div></div>
+  <div id="panel">
+    <div id="welcome">
+      <h2>How to use this</h2>
+      <div class="tip blue">🏹 <strong>Click an arrow</strong> — discuss that single direction. Its mirror on the other column is shown as context.</div>
+      <div class="tip purple">⬜⬜ <strong>Click two boxes</strong> — discuss the two-way relationship between those roles.</div>
+      <div class="tip gray">⬜ <strong>Click one box</strong> — highlight all connections to/from that role.</div>
+      <p>Toggle <strong>Staff / Students</strong> to shift discussion prompts. Set a stance (✅ ⚠️ ❌), add notes, and save to the policy log.<br><br>Use <strong>⬇ CSV</strong> to export the session's policy decisions.</p>
+    </div>
+    <div id="editor">
+      <div id="ed-header">
+        <div id="ed-mode-tag" class="single">Single direction</div>
+        <div id="ed-title"></div>
+        <div id="ed-sub"></div>
+      </div>
+      <div id="ed-body">
+        <div>
+          <div class="ed-section-label">Policy stance</div>
+          <div class="stance-row">
+            <div class="stance-btn ok"   onclick="setStance('ok')">✅ Permitted</div>
+            <div class="stance-btn cond" onclick="setStance('cond')">⚠️ Conditional</div>
+            <div class="stance-btn no"   onclick="setStance('no')">❌ Prohibited</div>
+          </div>
+        </div>
+        <div>
+          <div class="ed-section-label">Discussion prompt</div>
+          <div class="prompt-box" id="prompt-display"></div>
+          <textarea class="prompt-ta" id="prompt-ta" rows="4"></textarea>
+          <div class="prompt-actions">
+            <button class="prompt-edit-btn" id="prompt-edit-btn"  onclick="togglePromptEdit()">Edit prompt</button>
+            <button class="prompt-edit-btn" id="prompt-reset-btn" onclick="resetPrompt()" style="display:none">Reset default</button>
+          </div>
+        </div>
+        <div>
+          <div class="ed-section-label">Notes / decision</div>
+          <textarea id="ed-notes" rows="3" placeholder="Record your group's decision or key points…"></textarea>
+        </div>
+      </div>
+      <div id="ed-footer">
+        <button class="ed-btn save"  onclick="savePolicy()">Save</button>
+        <button class="ed-btn clear" onclick="clearPolicy()">Clear</button>
+        <button class="ed-btn close" onclick="closeEditor()">Close</button>
+      </div>
+    </div>
+
+    <div id="log-section">
+      <div id="log-header"><h3>Policy Log</h3><span id="log-count">0 decisions</span></div>
+      <div id="log-list"><div id="log-empty">No policies set yet.</div></div>
+    </div>
+    <div id="legend">
+      <div class="leg"><div class="leg-dot" style="background:#16a34a"></div>Permitted</div>
+      <div class="leg"><div class="leg-dot" style="background:#f59e0b"></div>Conditional</div>
+      <div class="leg"><div class="leg-dot" style="background:#ef4444"></div>Prohibited</div>
+      <div class="leg"><div class="leg-dot" style="background:#d1d5db"></div>Undecided</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Layout ────────────────────────────────────────────────────────
+const BW=200,BH=82,GAP_X=130,GAP_Y=68;
+const MAP_W=BW*2+GAP_X, MAP_H=BH*4+GAP_Y*3;
+const col1L=0, col2L=BW+GAP_X;
+const col1C=BW/2, col2C=col2L+BW/2;
+const rowT=r=>r*(BH+GAP_Y), rowC=r=>rowT(r)+BH/2;
+const lx=col1C, rx=col2C, OL=-60, OR=MAP_W+60;
+
+const map=document.getElementById('map');
+map.style.width=MAP_W+'px'; map.style.height=MAP_H+'px';
+
+const boxDefs=[
+  {id:'m1',col:1,row:0,label:'Manager',type:'manager'},
+  {id:'m2',col:2,row:0,label:'Manager',type:'manager'},
+  {id:'t1',col:1,row:1,label:'Teacher',type:'teacher'},
+  {id:'t2',col:2,row:1,label:'Teacher',type:'teacher'},
+  {id:'s1',col:1,row:2,label:'Student',type:'student'},
+  {id:'s2',col:2,row:2,label:'Student',type:'student'},
+  {id:'home',col:0,row:3,label:'Home',type:'home'},
+];
+boxDefs.forEach(b=>{
+  const d=document.createElement('div');
+  d.className=`box type-${b.type}`; d.id=b.id;
+  const left=b.id==='home'?0:(b.col===1?col1L:col2L);
+  const w=b.id==='home'?MAP_W:BW;
+  Object.assign(d.style,{left:left+'px',top:rowT(b.row)+'px',width:w+'px',height:BH+'px'});
+  d.innerHTML=`<span>${b.label}</span><span class="hint">now click another…</span>`;
+  map.appendChild(d);
+});
+
+const AW=14,AL=19;
+function arrowPoly(x1,y1,x2,y2){
+  const dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy)||1;
+  const ux=dx/len,uy=dy/len,px=-uy,py=ux;
+  const bx=x2-ux*AL,by=y2-uy*AL;
+  return `${x2},${y2} ${bx+px*AW},${by+py*AW} ${bx-px*AW},${by-py*AW}`;
+}
+
+// ── Default prompts ───────────────────────────────────────────────
+// Three slots per relationship: fwd (A→B), rev (B→A), pair (A↔B)
+// Keys: connId for single arrows, pairKey for two-way
+const DEFAULT_PROMPTS = {
+  // ── Manager ↔ Manager ──
+  'm1-m2': {
+    staff: "Should AI draft or summarise messages that managers send to each other? Who is accountable for an AI-generated directive?",
+    students: "Should school leaders use AI to write messages to each other? What could go wrong?"
+  },
+  'm2-m1': {
+    staff: "Same channel, other direction — does the sender's role change who is accountable?",
+    students: "Does it matter which manager sends the AI-generated message?"
+  },
+  'manager-manager': {
+    staff: "Should AI mediate any communication between managers? What are the accountability implications when neither party authors their own messages?",
+    students: "If both managers are using AI to write to each other, who is actually having the conversation?"
+  },
+  // ── Teacher ↔ Teacher ──
+  't1-t2': {
+    staff: "Should AI assist teachers in sharing resources or lesson plans with peers? Could it subtly homogenise practice across the department?",
+    students: "Should teachers use AI when sharing ideas or resources with other teachers?"
+  },
+  't2-t1': {
+    staff: "Same channel, other direction — is there an asymmetry of risk depending on who initiates?",
+    students: "Does it matter which teacher starts using AI to communicate with the other?"
+  },
+  'teacher-teacher': {
+    staff: "Where is AI genuinely helpful in teacher-to-teacher collaboration — and where might it erode the professional dialogue that makes collaboration valuable?",
+    students: "If teachers rely on AI to plan and share lessons, does that change the kind of teaching you receive?"
+  },
+  // ── Student ↔ Student ──
+  's1-s2': {
+    staff: "Should AI be permitted in student-to-student communication — group projects, peer feedback, social messaging in school contexts?",
+    students: "Is it OK to use AI when working or messaging a classmate? Does the context (schoolwork vs social) change your answer?"
+  },
+  's2-s1': {
+    staff: "Same channel — is there a meaningful policy distinction between initiating and responding with AI assistance?",
+    students: "If your classmate uses AI to message you, how does that feel? Does it matter?"
+  },
+  'student-student': {
+    staff: "How should school policy address AI in peer-to-peer communication — collaboration, peer feedback, and social messaging? What's the difference between assistance and replacement?",
+    students: "Where's the line between using AI to help you work with friends and letting it do the work for you? Who draws that line — you or the school?"
+  },
+  // ── Manager ↔ Teacher ──
+  'm1-t1': {
+    staff: "Should managers use AI to draft directives, appraisals or feedback for teachers? Should teachers be told when a message is AI-generated?",
+    students: "Should the headteacher use AI to write instructions to your teacher? Would your teacher want to know?"
+  },
+  't1-m1': {
+    staff: "Should teachers use AI to draft reports, data summaries or responses to management? What disclosure is appropriate?",
+    students: "Should teachers use AI to write reports about their class to the headteacher?"
+  },
+  'm2-t2': {
+    staff: "Should managers use AI to draft directives, appraisals or feedback for teachers? Should teachers be told when a message is AI-generated?",
+    students: "Should the headteacher use AI to write instructions to your teacher? Would your teacher want to know?"
+  },
+  't2-m2': {
+    staff: "Should teachers use AI to draft reports, data summaries or responses to management? What disclosure is appropriate?",
+    students: "Should teachers use AI to write reports about their class to the headteacher?"
+  },
+  'manager-teacher': {
+    staff: "What AI policies should govern the management–teacher relationship in both directions? How does power asymmetry affect the risks — is AI-generated feedback from a manager more concerning than AI-drafted reports from a teacher?",
+    students: "Should the people who run your school and the people who teach you use AI to communicate with each other? Does the direction — who's in charge — change the concern?"
+  },
+  // ── Teacher ↔ Student ──
+  't1-s1': {
+    staff: "Where is AI acceptable in teacher-to-student communication — written feedback, marking, lesson content? Should students always know when AI has been involved?",
+    students: "How do you feel about AI marking your work or writing feedback to you instead of your teacher? What would you want to know?"
+  },
+  's1-t1': {
+    staff: "Should students be permitted to submit AI-assisted work? How do we define academic integrity when AI can generate fluent, plausible responses?",
+    students: "Where's the line between using AI to help you learn and using it to do your work for you? Who decides — you, your teacher, or the school?"
+  },
+  't2-s2': {
+    staff: "Where is AI acceptable in teacher-to-student communication — written feedback, marking, lesson content? Should students always know when AI has been involved?",
+    students: "How do you feel about AI marking your work or writing feedback to you instead of your teacher? What would you want to know?"
+  },
+  's2-t2': {
+    staff: "Should students be permitted to submit AI-assisted work? How do we define academic integrity when AI can generate fluent, plausible responses?",
+    students: "Where's the line between using AI to help you learn and using it to do your work for you? Who decides — you, your teacher, or the school?"
+  },
+  'teacher-student': {
+    staff: "The teacher–student relationship is the core of education. In both directions, where does AI assist without undermining — and where does it fundamentally change what it means to teach or to learn?",
+    students: "If teachers use AI to give you feedback, and you use AI to submit work, is anyone really communicating? What gets lost — and does it matter?"
+  },
+  // ── Student ↔ Home ──
+  's1-home': {
+    staff: "Should schools have clear policies on students using AI at home for tutoring or paid services? How does unequal access to paid AI tools affect educational equity and assessment?",
+    students: "Is it fair to use paid AI tutoring or homework helpers at home? Does access to paid models change the game for learners?"
+  },
+  'home-s1': {
+    staff: "Should parents use AI tools to support or replace their child's learning at home — including paid tutoring services? What guidance should schools provide to parents about responsible use?",
+    students: "If your parents use AI tools at home to help with your learning, does that help you or make things harder?"
+  },
+  's2-home': {
+    staff: "Should schools have clear policies on students using AI at home for tutoring or paid services? How does unequal access to paid AI tools affect educational equity and assessment?",
+    students: "Is it fair to use paid AI tutoring or homework helpers at home? Does access to paid models change the game for learners?"
+  },
+  'home-s2': {
+    staff: "Should parents use AI tools to support or replace their child's learning at home — including paid tutoring services? What guidance should schools provide to parents about responsible use?",
+    students: "If your parents use AI tools at home to help with your learning, does that help you or make things harder?"
+  },
+  'student-home': {
+    staff: "How should policy treat AI use in student–home interactions — tutoring, parental assistance, or paid models — balancing accessibility, equity and authenticity of student work?",
+    students: "If you use AI at home for tutoring or homework, or your parents use paid tools to support you, how should schools take that into account?"
+  },
+  // ── Manager ↔ Student ──
+  'm1-s1': {
+    staff: "Direct manager–student contact is rare but often significant: exclusions, commendations, safeguarding. Should AI ever draft these communications? What's at stake when it does?",
+    students: "Should the headteacher ever use AI to write directly to a student — for example about an exclusion, an award, or a concern? When might that be OK, and when not?"
+  },
+  's1-m1': {
+    staff: "Students raising concerns with leadership — complaints, disclosures, appeals. Should AI assist in drafting these? Does AI assistance make these communications more or less credible?",
+    students: "If you needed to tell the headteacher something serious, would it be OK to use AI to help you write it? Would that make it more or less likely to be taken seriously?"
+  },
+  'manager-student': {
+    staff: "The manager–student channel is uncommon but high-stakes. In both directions, AI involvement risks depersonalising moments that depend on authentic human judgement and care. Where, if anywhere, is AI acceptable here?",
+    students: "Should there be AI involved in any communication between a headteacher and a student? Does the reason for the communication change your answer?"
+  },
+  // ── Teacher ↔ Home ──
+  't2-home': {
+    staff: "How should teachers and parents use AI when communicating concerns or problems about a student? Is AI appropriate for drafting sensitive messages, or only for summaries and translations?",
+    students: "Would you want teachers or parents to use AI when discussing problems about you? How should privacy and sensitivity be handled?"
+  },
+  'home-t2': {
+    staff: "When parents contact teachers about issues or concerns, should AI be permitted to draft or translate messages? How do we ensure tone, accuracy and safeguarding?",
+    students: "If your parents use AI to write to your teacher about a problem, would that affect how the issue is handled?"
+  },
+  'teacher-home': {
+    staff: "Teacher–home communications should prioritise clarity and safeguarding: when is AI acceptable for drafting or translating messages about concerns, and when must a human take responsibility?",
+    students: "If AI is used by teachers or parents to communicate problems, does that change how the situation is understood or resolved?"
+  },
+};
+
+// Mutable copies (allow editing)
+let prompts = JSON.parse(JSON.stringify(DEFAULT_PROMPTS));
+
+// ── Connection defs ───────────────────────────────────────────────
+const connDefs=[
+  {id:'m1-m2', label:'Manager → Manager', participants:['m1','m2'], pairKey:'manager-manager', mirrorId:'m2-m1', x1:col1L+BW,y1:rowC(0)-9,x2:col2L,y2:rowC(0)-9},
+  {id:'m2-m1', label:'Manager → Manager', participants:['m2','m1'], pairKey:'manager-manager', mirrorId:'m1-m2', x1:col2L,y1:rowC(0)+9,x2:col1L+BW,y2:rowC(0)+9},
+  {id:'t1-t2', label:'Teacher → Teacher', participants:['t1','t2'], pairKey:'teacher-teacher',  mirrorId:'t2-t1', x1:col1L+BW,y1:rowC(1)-9,x2:col2L,y2:rowC(1)-9},
+  {id:'t2-t1', label:'Teacher → Teacher', participants:['t2','t1'], pairKey:'teacher-teacher',  mirrorId:'t1-t2', x1:col2L,y1:rowC(1)+9,x2:col1L+BW,y2:rowC(1)+9},
+  {id:'s1-s2', label:'Student → Student', participants:['s1','s2'], pairKey:'student-student',  mirrorId:'s2-s1', x1:col1L+BW,y1:rowC(2)-9,x2:col2L,y2:rowC(2)-9},
+  {id:'s2-s1', label:'Student → Student', participants:['s2','s1'], pairKey:'student-student',  mirrorId:'s1-s2', x1:col2L,y1:rowC(2)+9,x2:col1L+BW,y2:rowC(2)+9},
+  {id:'m1-t1', label:'Manager → Teacher', participants:['m1','t1'], pairKey:'manager-teacher',  mirrorId:'m2-t2', x1:lx-15,y1:rowT(0)+BH,x2:lx-15,y2:rowT(1)},
+  {id:'t1-m1', label:'Teacher → Manager', participants:['t1','m1'], pairKey:'manager-teacher',  mirrorId:'t2-m2', x1:lx+15,y1:rowT(1),x2:lx+15,y2:rowT(0)+BH},
+  {id:'t1-s1', label:'Teacher → Student', participants:['t1','s1'], pairKey:'teacher-student',  mirrorId:'t2-s2', x1:lx-15,y1:rowT(1)+BH,x2:lx-15,y2:rowT(2)},
+  {id:'s1-t1', label:'Student → Teacher', participants:['s1','t1'], pairKey:'teacher-student',  mirrorId:'s2-t2', x1:lx+15,y1:rowT(2),x2:lx+15,y2:rowT(1)+BH},
+  {id:'s1-home',label:'Student → Home',  participants:['s1','home'],pairKey:'student-home',     mirrorId:'s2-home',x1:lx-15,y1:rowT(2)+BH,x2:lx-15,y2:rowT(3)},
+  {id:'home-s1',label:'Home → Student',  participants:['home','s1'],pairKey:'student-home',     mirrorId:'home-s2',x1:lx+15,y1:rowT(3),x2:lx+15,y2:rowT(2)+BH},
+  {id:'m2-t2', label:'Manager → Teacher', participants:['m2','t2'], pairKey:'manager-teacher',  mirrorId:'m1-t1', x1:rx-15,y1:rowT(0)+BH,x2:rx-15,y2:rowT(1)},
+  {id:'t2-m2', label:'Teacher → Manager', participants:['t2','m2'], pairKey:'manager-teacher',  mirrorId:'t1-m1', x1:rx+15,y1:rowT(1),x2:rx+15,y2:rowT(0)+BH},
+  {id:'t2-s2', label:'Teacher → Student', participants:['t2','s2'], pairKey:'teacher-student',  mirrorId:'t1-s1', x1:rx-15,y1:rowT(1)+BH,x2:rx-15,y2:rowT(2)},
+  {id:'s2-t2', label:'Student → Teacher', participants:['s2','t2'], pairKey:'teacher-student',  mirrorId:'s1-t1', x1:rx+15,y1:rowT(2),x2:rx+15,y2:rowT(1)+BH},
+  {id:'s2-home',label:'Student → Home',  participants:['s2','home'],pairKey:'student-home',     mirrorId:'s1-home',x1:rx-15,y1:rowT(2)+BH,x2:rx-15,y2:rowT(3)},
+  {id:'home-s2',label:'Home → Student',  participants:['home','s2'],pairKey:'student-home',     mirrorId:'home-s1',x1:rx+15,y1:rowT(3),x2:rx+15,y2:rowT(2)+BH},
+  {id:'m1-s1', label:'Manager → Student', participants:['m1','s1'], pairKey:'manager-student',  mirrorId:null, pts:[[col1L,rowC(0)-10],[OL,rowC(0)-10],[OL,rowC(2)-10],[col1L,rowC(2)-10]]},
+  {id:'s1-m1', label:'Student → Manager', participants:['s1','m1'], pairKey:'manager-student',  mirrorId:null, pts:[[col1L,rowC(2)+10],[OL-18,rowC(2)+10],[OL-18,rowC(0)+10],[col1L,rowC(0)+10]]},
+  {id:'t2-home',label:'Teacher → Home',  participants:['t2','home'],pairKey:'teacher-home',     mirrorId:null, pts:[[col2L+BW,rowC(1)-10],[OR,rowC(1)-10],[OR,rowC(3)-10],[MAP_W,rowC(3)-10]]},
+  {id:'home-t2',label:'Home → Teacher',  participants:['home','t2'],pairKey:'teacher-home',     mirrorId:null, pts:[[MAP_W,rowC(3)+10],[OR+18,rowC(3)+10],[OR+18,rowC(1)+10],[col2L+BW,rowC(1)+10]]},
+];
+
+const connById={};
+connDefs.forEach(c=>connById[c.id]=c);
+
+const pairConnIds={};
+connDefs.forEach(c=>{
+  if(!pairConnIds[c.pairKey]) pairConnIds[c.pairKey]=[];
+  pairConnIds[c.pairKey].push(c.id);
+});
+
+const typePairMap={
+  'manager-manager':'manager-manager','teacher-teacher':'teacher-teacher','student-student':'student-student',
+  'manager-teacher':'manager-teacher','teacher-manager':'manager-teacher',
+  'student-teacher':'teacher-student','teacher-student':'teacher-student',
+  'home-student':'student-home','student-home':'student-home',
+  'manager-student':'manager-student','student-manager':'manager-student',
+  'home-teacher':'teacher-home','teacher-home':'teacher-home',
+};
+
+// ── Build SVG ─────────────────────────────────────────────────────
+const svg=document.getElementById('svg');
+svg.setAttribute('viewBox',`0 0 ${MAP_W} ${MAP_H}`);
+const lineEls={},arrowEls={};
+connDefs.forEach(c=>{
+  if(c.pts){
+    const pl=document.createElementNS('http://www.w3.org/2000/svg','polyline');
+    pl.setAttribute('points',c.pts.map(p=>p.join(',')).join(' '));
+    pl.classList.add('line'); pl.dataset.id=c.id; svg.appendChild(pl); lineEls[c.id]=pl;
+    const n=c.pts.length, poly=document.createElementNS('http://www.w3.org/2000/svg','polygon');
+    poly.setAttribute('points',arrowPoly(c.pts[n-2][0],c.pts[n-2][1],c.pts[n-1][0],c.pts[n-1][1]));
+    poly.classList.add('arrow'); poly.dataset.id=c.id; svg.appendChild(poly); arrowEls[c.id]=poly;
+  } else {
+    const ln=document.createElementNS('http://www.w3.org/2000/svg','line');
+    ln.setAttribute('x1',c.x1); ln.setAttribute('y1',c.y1); ln.setAttribute('x2',c.x2); ln.setAttribute('y2',c.y2);
+    ln.classList.add('line'); ln.dataset.id=c.id; svg.appendChild(ln); lineEls[c.id]=ln;
+    const poly=document.createElementNS('http://www.w3.org/2000/svg','polygon');
+    poly.setAttribute('points',arrowPoly(c.x1,c.y1,c.x2,c.y2));
+    poly.classList.add('arrow'); poly.dataset.id=c.id; svg.appendChild(poly); arrowEls[c.id]=poly;
+  }
+});
+
+// ── State ─────────────────────────────────────────────────────────
+const policies={};  // key (connId or pairKey) → {stance, notes}
+let audience='staff';
+let firstBox=null;
+let currentKey=null;
+let currentIsPair=false;
+let currentStance=null;
+let promptEditing=false;
+
+// ── Audience ──────────────────────────────────────────────────────
+function setAudience(a){
+  audience=a;
+  document.querySelectorAll('.pill-btn').forEach(b=>b.classList.toggle('active',b.dataset.aud===a));
+  if(currentKey) refreshPromptDisplay();
+}
+
+function getAdHocDefault(key){
+  if(!key||!key.startsWith('adhoc:')) return null;
+  const ids = key.replace('adhoc:','').split('-');
+  const a = (boxDefs.find(b=>b.id===ids[0])||{}).label || ids[0];
+  const b = (boxDefs.find(b=>b.id===ids[1])||{}).label || ids[1];
+  return {
+    staff: `Discuss appropriate AI use between ${a} and ${b}: where assistance is helpful, who is responsible, disclosure and safeguards.`,
+    students: `Discuss how AI might be used between ${a} and ${b}. What would feel acceptable or not, and why?`
+  };
+}
+
+function getPrompt(key){
+  const p=prompts[key];
+  if(p) return p[audience]||p.staff||'';
+  const adh=getAdHocDefault(key);
+  if(adh) return adh[audience]||adh.staff||'';
+  return '';
+}
+
+function refreshPromptDisplay(){
+  const txt=getPrompt(currentKey);
+  document.getElementById('prompt-display').textContent=txt;
+  document.getElementById('prompt-ta').value=txt;
+}
+
+// ── Visual ────────────────────────────────────────────────────────
+const hiCls=['hi-blue','hi-purple','hi-gray','faded'];
+const pCls=['policy-ok','policy-cond','policy-no'];
+
+function clearLineVisual(id){
+  const ln=lineEls[id],ar=arrowEls[id]; if(!ln) return;
+  hiCls.forEach(c=>{ln.classList.remove(c);ar.classList.remove(c);});
+  const badge=document.getElementById('badge-'+id);
+  if(badge) badge.style.opacity='1';
+}
+
+function setLineVisual(id,cls,badgeOp='1'){
+  clearLineVisual(id);
+  if(cls){ lineEls[id]?.classList.add(cls); arrowEls[id]?.classList.add(cls); }
+  const badge=document.getElementById('badge-'+id);
+  if(badge) badge.style.opacity=badgeOp;
+}
+
+function clearAllVisual(){
+  connDefs.forEach(c=>clearLineVisual(c.id));
+  boxDefs.forEach(b=>document.getElementById(b.id).classList.remove('box-first','pair-hi','focus-hi','faded'));
+  // Re-apply policy colours only (no hi- classes)
+  connDefs.forEach(c=>applyPolicyStyle(c.id, getPolicyForConn(c.id)));
+}
+
+function fadeAllExcept(keepIds){
+  connDefs.forEach(c=>{
+    if(!keepIds.includes(c.id)){
+      lineEls[c.id]?.classList.add('faded');
+      arrowEls[c.id]?.classList.add('faded');
+      const badge=document.getElementById('badge-'+c.id);
+      if(badge) badge.style.opacity='0.1';
+    }
+  });
+}
+
+// ── Box interaction ───────────────────────────────────────────────
+boxDefs.forEach(b=>{
+  document.getElementById(b.id).addEventListener('click',e=>{
+    e.stopPropagation(); handleBoxClick(b.id);
+  });
+});
+
+function handleBoxClick(bid){
+  if(firstBox!==null){
+    if(firstBox===bid){ firstBox=null; clearAllVisual(); closeEditor(); return; }
+    // Second box
+    const aType=boxDefs.find(b=>b.id===firstBox)?.type;
+    const bType=boxDefs.find(b=>b.id===bid)?.type;
+    const types=[aType,bType].sort().join('-');
+    const pk=typePairMap[types];
+    const prev=firstBox; firstBox=null;
+    clearAllVisual();
+    if(pk){ openPairEditor(pk); }
+    else {
+      // No predefined pair/channel — open an ad-hoc two-box editor
+      const adhocKey = `adhoc:${prev}-${bid}`;
+      openAdHocPairEditor(prev,bid,adhocKey);
+    }
+    return;
+  }
+  // First box
+  closeEditor(); firstBox=bid; clearAllVisual();
+  document.getElementById(bid).classList.add('box-first');
+  const ids=connDefs.filter(c=>c.participants.includes(bid)).map(c=>c.id);
+  fadeAllExcept(ids); ids.forEach(id=>setLineVisual(id,'hi-blue'));
+  boxDefs.forEach(b=>{ if(b.id!==bid) document.getElementById(b.id).classList.add('faded'); });
+}
+
+document.getElementById('canvas-wrap').addEventListener('click',()=>{ firstBox=null; clearAllVisual(); closeEditor(); });
+map.addEventListener('click',e=>e.stopPropagation());
+
+// ── Open editors ──────────────────────────────────────────────────
+function openPairEditor(pk){
+  currentKey=pk; currentIsPair=true;
+  currentStance=policies[pk]?.stance||null; promptEditing=false;
+  clearAllVisual();
+  const ids=pairConnIds[pk]||[];
+  fadeAllExcept(ids); ids.forEach(id=>setLineVisual(id,'hi-purple'));
+  const involved=new Set(connDefs.filter(c=>ids.includes(c.id)).flatMap(c=>c.participants));
+  boxDefs.forEach(b=>{
+    document.getElementById(b.id).classList[involved.has(b.id)?'add':'add'](involved.has(b.id)?'pair-hi':'faded');
+    if(!involved.has(b.id)) document.getElementById(b.id).classList.add('faded');
+  });
+  document.getElementById('ed-mode-tag').textContent='Two-way discussion';
+  document.getElementById('ed-mode-tag').className='ed-mode-tag pair';
+  document.getElementById('ed-title').textContent=formatPairTitle(pk);
+  document.getElementById('ed-sub').textContent='Policy applies to both directions';
+  showEditor();
+}
+
+// Open an ad-hoc pair editor for two boxes that have no predefined channel
+function openAdHocPairEditor(aId,bId, key){
+  currentKey=key; currentIsPair=true;
+  currentStance=policies[key]?.stance||null; promptEditing=false;
+  clearAllVisual();
+  // Highlight the two boxes
+  boxDefs.forEach(b=>{
+    const el=document.getElementById(b.id);
+    if(b.id===aId||b.id===bId) el.classList.add('pair-hi');
+    else el.classList.add('faded');
+  });
+  // No lines to highlight (ad-hoc)
+  document.getElementById('ed-mode-tag').textContent='Two-way discussion';
+  document.getElementById('ed-mode-tag').className='ed-mode-tag pair';
+  const aLabel = (boxDefs.find(b=>b.id===aId)||{}).label||aId;
+  const bLabel = (boxDefs.find(b=>b.id===bId)||{}).label||bId;
+  document.getElementById('ed-title').textContent=`${aLabel} ↔ ${bLabel}`;
+  document.getElementById('ed-sub').textContent='Ad-hoc two-way discussion (no existing channel)';
+  showEditor();
+}
+
+function openSingleEditor(c){
+  currentKey=c.id; currentIsPair=false;
+  currentStance=policies[c.id]?.stance||null; promptEditing=false;
+  firstBox=null; clearAllVisual();
+  const keep=[c.id]; if(c.mirrorId) keep.push(c.mirrorId);
+  fadeAllExcept(keep);
+  setLineVisual(c.id,'hi-blue');
+  if(c.mirrorId) setLineVisual(c.mirrorId,'hi-gray','0.55');
+  const involved=new Set(c.participants);
+  if(c.mirrorId) connById[c.mirrorId]?.participants.forEach(p=>involved.add(p));
+  boxDefs.forEach(b=>{
+    const el=document.getElementById(b.id);
+    if(involved.has(b.id)) el.classList.add('focus-hi');
+    else el.classList.add('faded');
+  });
+  document.getElementById('ed-mode-tag').textContent='Single direction';
+  document.getElementById('ed-mode-tag').className='ed-mode-tag single';
+  document.getElementById('ed-title').textContent=c.label;
+  document.getElementById('ed-sub').textContent=c.mirrorId
+    ?`Mirror shown: ${connById[c.mirrorId]?.label}`:'';
+  showEditor();
+}
+
+function showEditor(){
+  document.getElementById('ed-notes').value=policies[currentKey]?.notes||'';
+  refreshPromptDisplay();
+  document.getElementById('prompt-display').style.display='block';
+  document.getElementById('prompt-ta').style.display='none';
+  document.getElementById('prompt-edit-btn').textContent='Edit prompt';
+  const hasCustom = prompts[currentKey] && JSON.stringify(prompts[currentKey]) !== JSON.stringify(DEFAULT_PROMPTS[currentKey]);
+  document.getElementById('prompt-reset-btn').style.display=hasCustom?'inline-block':'none';
+  setStance(currentStance);
+  document.getElementById('welcome').style.display='none';
+  document.getElementById('editor').style.display='flex';
+}
+
+function closeEditor(){
+  currentKey=null; currentIsPair=false; currentStance=null; promptEditing=false;
+  document.getElementById('editor').style.display='none';
+  document.getElementById('welcome').style.display='flex';
+}
+
+function formatPairTitle(pk){
+  return({'manager-manager':'Manager ↔ Manager','teacher-teacher':'Teacher ↔ Teacher',
+    'student-student':'Student ↔ Student','manager-teacher':'Manager ↔ Teacher',
+    'teacher-student':'Teacher ↔ Student','student-home':'Student ↔ Home',
+    'manager-student':'Manager ↔ Student','teacher-home':'Teacher ↔ Home'})[pk]||pk;
+}
+
+// ── Stance ────────────────────────────────────────────────────────
+function setStance(s){
+  currentStance=s;
+  document.querySelectorAll('.stance-btn').forEach(b=>b.classList.toggle('active',b.classList.contains(s||'__')));
+}
+
+// ── Prompt edit ───────────────────────────────────────────────────
+function togglePromptEdit(){
+  promptEditing=!promptEditing;
+  document.getElementById('prompt-display').style.display=promptEditing?'none':'block';
+  document.getElementById('prompt-ta').style.display=promptEditing?'block':'none';
+  document.getElementById('prompt-edit-btn').textContent=promptEditing?'Done editing':'Edit prompt';
+  document.getElementById('prompt-reset-btn').style.display='inline-block';
+  if(!promptEditing&&currentKey){
+    const val=document.getElementById('prompt-ta').value.trim();
+    if(!prompts[currentKey]) prompts[currentKey]={};
+    prompts[currentKey][audience]=val;
+    document.getElementById('prompt-display').textContent=val;
+  }
+}
+
+function resetPrompt(){
+  if(!currentKey||!DEFAULT_PROMPTS[currentKey]) return;
+  prompts[currentKey]=JSON.parse(JSON.stringify(DEFAULT_PROMPTS[currentKey]));
+  promptEditing=false;
+  refreshPromptDisplay();
+  document.getElementById('prompt-display').style.display='block';
+  document.getElementById('prompt-ta').style.display='none';
+  document.getElementById('prompt-edit-btn').textContent='Edit prompt';
+  document.getElementById('prompt-reset-btn').style.display='none';
+}
+
+// ── Save / Clear / Reset ──────────────────────────────────────────
+function savePolicy(){
+  if(promptEditing) togglePromptEdit();
+  if(!currentKey) return;
+  policies[currentKey]={stance:currentStance, notes:document.getElementById('ed-notes').value.trim()};
+  const targets=currentIsPair
+    ?(pairConnIds[currentKey]||[]).map(id=>connById[id]).filter(Boolean)
+    :[connById[currentKey]].filter(Boolean);
+  targets.forEach(c=>{ applyPolicyStyle(c.id,currentStance); placeBadge(c); });
+  updateLog(); closeEditor(); clearAllVisual();
+}
+
+function clearPolicy(){
+  if(!currentKey) return;
+  delete policies[currentKey];
+  const targets=currentIsPair
+    ?(pairConnIds[currentKey]||[]).map(id=>connById[id]).filter(Boolean)
+    :[connById[currentKey]].filter(Boolean);
+  targets.forEach(c=>{ applyPolicyStyle(c.id,null); document.getElementById('badge-'+c.id)?.remove(); });
+  updateLog(); closeEditor(); clearAllVisual();
+}
+
+function doResetAll(){
+  if(!confirm('Reset all policies, notes and clear the log? (Edited prompts are kept.)')) return;
+  // Clear policies only — not prompts
+  Object.keys(policies).forEach(k=>delete policies[k]);
+  // Remove all badges and policy styles
+  connDefs.forEach(c=>{
+    applyPolicyStyle(c.id,null);
+    document.getElementById('badge-'+c.id)?.remove();
+  });
+  updateLog();
+  closeEditor();
+  // Explicitly clear all visual state without re-applying policies
+  connDefs.forEach(c=>clearLineVisual(c.id));
+  boxDefs.forEach(b=>document.getElementById(b.id).classList.remove('box-first','pair-hi','focus-hi','faded'));
+  firstBox=null;
+}
+
+// ── Policy styles & badges ────────────────────────────────────────
+function getPolicyForConn(id){
+  const c=connById[id]; if(!c) return null;
+  return (policies[id]||policies[c.pairKey])?.stance||null;
+}
+
+function applyPolicyStyle(id,stance){
+  const ln=lineEls[id],ar=arrowEls[id]; if(!ln) return;
+  ln.classList.remove(...pCls); ar.classList.remove(...pCls);
+  if(stance){ ln.classList.add('policy-'+stance); ar.classList.add('policy-'+stance); }
+}
+
+function midpoint(c){
+  if(c.pts){const n=c.pts.length,m=Math.floor(n/2);return[(c.pts[m-1][0]+c.pts[m][0])/2,(c.pts[m-1][1]+c.pts[m][1])/2];}
+  return[(c.x1+c.x2)/2,(c.y1+c.y2)/2];
+}
+
+function placeBadge(c){
+  document.getElementById('badge-'+c.id)?.remove();
+  const stance=getPolicyForConn(c.id); if(!stance) return;
+  const [mx,my]=midpoint(c);
+  const badge=document.createElement('div');
+  badge.className=`ai-badge policy-${stance}`; badge.id='badge-'+c.id;
+  badge.textContent=stance==='ok'?'✅':stance==='cond'?'⚠️':'❌';
+  badge.style.left=mx+'px'; badge.style.top=my+'px';
+  const p=policies[c.id]||policies[c.pairKey];
+  badge.title=p?.notes||c.label;
+  badge.addEventListener('click',e=>{ e.stopPropagation(); openSingleEditor(c); });
+  map.appendChild(badge);
+}
+
+// ── Log ───────────────────────────────────────────────────────────
+const stanceLabel={ok:'✅ Permitted',cond:'⚠️ Conditional',no:'❌ Prohibited'};
+function updateLog(){
+  const list=document.getElementById('log-list');
+  list.querySelectorAll('.log-card').forEach(c=>c.remove());
+  const seen=new Set(), entries=[];
+  connDefs.forEach(c=>{
+    if(policies[c.id]&&!seen.has(c.id)){ seen.add(c.id); entries.push({key:c.id,label:c.label}); }
+    if(policies[c.pairKey]&&!seen.has(c.pairKey)){ seen.add(c.pairKey); entries.push({key:c.pairKey,label:formatPairTitle(c.pairKey)}); }
+  });
+  // Include any ad-hoc or other policy keys not associated with connDefs
+  Object.keys(policies).forEach(k=>{
+    if(!seen.has(k)){
+      seen.add(k);
+      let label = k;
+      if(k.startsWith('adhoc:')){
+        const parts=k.replace('adhoc:','').split('-');
+        const a=(boxDefs.find(b=>b.id===parts[0])||{}).label||parts[0];
+        const b=(boxDefs.find(b=>b.id===parts[1])||{}).label||parts[1];
+        label = `${a} ↔ ${b}`;
+      } else if(formatPairTitle(k)!==k){
+        label = formatPairTitle(k);
+      }
+      entries.push({key:k,label});
+    }
+  });
+  document.getElementById('log-empty').style.display=entries.length?'none':'block';
+  document.getElementById('log-count').textContent=entries.length+' decision'+(entries.length===1?'':'s');
+  entries.forEach(({key,label})=>{
+    const p=policies[key]; if(!p) return;
+    const card=document.createElement('div');
+    card.className=`log-card policy-${p.stance}`;
+    card.innerHTML=`<span class="lc-rm" onclick="event.stopPropagation();removePolicyByKey('${key}')">✕</span>
+      <div class="lc-label">${label}</div>
+      <div class="lc-stance">${stanceLabel[p.stance]}</div>
+      ${p.notes?`<div class="lc-note">"${p.notes}"</div>`:''}`;
+    list.appendChild(card);
+  });
+}
+
+function removePolicyByKey(key){
+  delete policies[key];
+  connDefs.filter(c=>c.id===key||c.pairKey===key).forEach(c=>{
+    applyPolicyStyle(c.id,null); document.getElementById('badge-'+c.id)?.remove();
+  });
+  updateLog();
+}
+
+// ── Export: CSV ───────────────────────────────────────────────────
+function exportCSV(){
+  const rows=[['Channel','Type','Stance','Notes']];
+  const seen=new Set();
+  connDefs.forEach(c=>{
+    [c.id, c.pairKey].forEach(key=>{
+      if(policies[key]&&!seen.has(key)){
+        seen.add(key);
+        const p=policies[key];
+        const label=key===c.id?c.label:formatPairTitle(c.pairKey);
+        const type=key===c.id?'Single direction':'Two-way';
+        rows.push([label,type,stanceLabel[p.stance]||'',p.notes||''].map(v=>`"${String(v).replace(/"/g,'""')}"`));
+      }
+    });
+  });
+  if(rows.length===1){ alert('No policies saved yet.'); return; }
+  const csv=rows.map(r=>r.join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='ai-policy-decisions.csv';
+  a.click();
+}
+
+svg.addEventListener('click',e=>{
+  const id=e.target.dataset.id; if(!id) return;
+  const c=connById[id]; if(!c) return;
+  openSingleEditor(c);
+});
+</script>
+</body>
+</html>

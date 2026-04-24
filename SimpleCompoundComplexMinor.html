@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Sentence Classifier — A Level</title>
+  <style>
+    :root {
+      --bg: #f7f7fb;
+      --fg: #111;
+      --muted: #555;
+      --card: #fff;
+      --accent: #3949ab;   /* Indigo */
+      --accent-2: #00897b; /* Teal */
+      --correct: #2e7d32;  /* Green */
+      --wrong: #c62828;    /* Red */
+      --focus: #ffb300;    /* Amber */
+      --btn: #e8eaf6;
+      --btn-border: #c5cae9;
+    }
+    [data-theme="dark"] {
+      --bg: #0f1116;
+      --fg: #e6e6e6;
+      --muted: #b3b3b3;
+      --card: #151922;
+      --accent: #8ab4f8;
+      --accent-2: #80cbc4;
+      --correct: #8bc34a;
+      --wrong: #ef5350;
+      --focus: #ffd54f;
+      --btn: #1f2633;
+      --btn-border: #313a4d;
+    }
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 1.2rem;
+      display: grid;
+      grid-template-rows: auto auto auto 1fr auto;
+      gap: 1rem;
+      min-height: 100dvh;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .title {
+      font-size: clamp(1.4rem, 2.8vw, 2rem);
+      font-weight: 800;
+      letter-spacing: 0.2px;
+    }
+    .controls {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    button, .chip {
+      font-size: clamp(1rem, 2.5vw, 1.25rem);
+      padding: 0.75rem 1rem;
+      border-radius: 12px;
+      border: 2px solid var(--btn-border);
+      background: var(--btn);
+      color: var(--fg);
+      cursor: pointer;
+      transition: transform 0.05s ease, background 0.2s ease, border-color 0.2s ease;
+      user-select: none;
+    }
+    button:enabled:hover, .chip:hover { transform: translateY(-1px); }
+    button:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .primary { background: var(--accent); color: white; border-color: transparent; }
+    .ghost { background: transparent; border-color: var(--btn-border); }
+    .accent2 { background: var(--accent-2); color: #062b26; border-color: transparent; }
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--btn-border);
+      border-radius: 16px;
+      padding: clamp(1rem, 2vw, 1.5rem);
+      box-shadow: 0 1px 0 rgba(0,0,0,0.05), 0 8px 24px rgba(0,0,0,0.06);
+    }
+    .sentence {
+      font-size: clamp(1.6rem, 4vw, 2.4rem);
+      line-height: 1.3;
+      font-weight: 700;
+      margin: 0.25rem 0 0;
+    }
+    .classification-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(200px, 1fr));
+      gap: 0.75rem;
+    }
+    .class-btn {
+      font-size: clamp(1.15rem, 2.8vw, 1.5rem);
+      padding: clamp(0.9rem, 2.2vw, 1.1rem);
+      font-weight: 700;
+    }
+    .class-btn.correct { border-color: var(--correct); box-shadow: 0 0 0 3px color-mix(in oklab, var(--correct) 30%, transparent); }
+    .class-btn.incorrect { border-color: var(--wrong); box-shadow: 0 0 0 3px color-mix(in oklab, var(--wrong) 30%, transparent); }
+    .feedback {
+      border-left: 6px solid;
+      border-radius: 12px;
+      padding: 0.75rem 1rem;
+      font-size: clamp(1rem, 2.5vw, 1.15rem);
+    }
+    .feedback.correct { border-color: var(--correct); background: color-mix(in oklab, var(--correct) 15%, transparent); }
+    .feedback.wrong { border-color: var(--wrong); background: color-mix(in oklab, var(--wrong) 15%, transparent); }
+    .muted { color: var(--muted); }
+    .meta {
+      display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-wrap: wrap;
+      font-size: clamp(0.95rem, 2.2vw, 1.05rem);
+    }
+    progress {
+      width: 100%; height: 14px; border: none; border-radius: 8px; background: var(--btn);
+    }
+    progress::-webkit-progress-bar { background: var(--btn); border-radius: 8px; }
+    progress::-webkit-progress-value { background: var(--accent); border-radius: 8px; }
+    .panel {
+      display: grid; gap: 0.75rem;
+    }
+    details { background: var(--card); border: 1px solid var(--btn-border); border-radius: 12px; padding: 0.5rem 0.75rem; }
+    details[open] { padding-bottom: 1rem; }
+    summary { cursor: pointer; font-weight: 700; }
+    textarea {
+      width: 100%; min-height: 160px; background: var(--bg); color: var(--fg);
+      border: 1px solid var(--btn-border); border-radius: 10px; padding: 0.75rem; font-size: 0.95rem;
+    }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    .pill { border-radius: 999px; padding: 0.25rem 0.6rem; font-weight: 700; }
+    .pill.correct { background: color-mix(in oklab, var(--correct) 90%, white); color: #0f3a0f; }
+    .pill.wrong { background: color-mix(in oklab, var(--wrong) 90%, white); color: #3a0f0f; }
+    footer { opacity: 0.85; }
+    @media (max-width: 560px) {
+      .classification-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container" id="app">
+    <header>
+      <div class="title">Sentence Classifier (Simple · Compound · Complex · Minor)</div>
+      <div class="controls">
+        <button id="themeBtn" class="ghost" aria-label="Toggle dark mode">🌙 Dark</button>
+        <button id="fsBtn" class="ghost" aria-label="Toggle full screen">⤢ Full Screen</button>
+        <button id="restartBtn" class="ghost" aria-label="Restart">⟲ Restart</button>
+      </div>
+    </header>
+
+    <div class="meta">
+      <div><span id="score">Score: 0</span> • <span id="progressText">1 / 20</span></div>
+      <div class="row">
+        <span class="muted">Shortcuts: 1=Simple  2=Compound  3=Complex  4=Minor</span>
+      </div>
+    </div>
+
+    <progress id="progressBar" max="20" value="0" aria-label="Progress"></progress>
+
+    <section class="card panel" aria-live="polite">
+      <div class="muted">Classify the sentence:</div>
+      <div id="sentence" class="sentence">Loading…</div>
+
+      <div class="classification-grid" id="buttons">
+        <button class="class-btn" data-choice="simple">Simple</button>
+        <button class="class-btn" data-choice="compound">Compound</button>
+        <button class="class-btn" data-choice="complex">Complex</button>
+        <button class="class-btn" data-choice="minor">Minor</button>
+      </div>
+
+      <div id="feedback" class="feedback" hidden>
+        <strong id="resultText">Correct!</strong>
+        <div id="explain" class="muted"></div>
+      </div>
+
+      <div class="row">
+        <button id="nextBtn" class="primary" disabled>Next →</button>
+        <button id="reshuffleBtn" class="ghost">🔀 Reshuffle Remaining</button>
+      </div>
+    </section>
+
+    <details>
+      <summary>Teacher Panel: paste your own sentences (optional)</summary>
+      <div class="panel">
+        <p><strong>Format:</strong> one per line as <code>sentence, type</code> where type is one of:
+          <code>simple</code>, <code>compound</code>, <code>complex</code>, <code>minor</code>.
+          <br />Example: <em>The rain stopped, and the sun came out, compound</em></p>
+        <textarea id="customInput" placeholder="Paste here... e.g.&#10;I revised for hours, simple&#10;Because the traffic was heavy, we missed the start, complex&#10;No running!, minor"></textarea>
+        <div class="row">
+          <button id="loadCustom" class="accent2">Load & Use</button>
+          <button id="saveCustom" class="ghost">Save to this browser</button>
+          <button id="clearCustom" class="ghost">Clear saved</button>
+          <span class="muted" id="customStatus" aria-live="polite"></span>
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary>What are the sentence types?</summary>
+      <div class="panel">
+        <p><strong>Simple:</strong> one independent clause (one subject + one finite verb). No dependent clauses.</p>
+        <p><strong>Compound:</strong> two or more independent clauses joined by a coordinating conjunction (for, and, nor, but, or, yet, so) or a semicolon.</p>
+        <p><strong>Complex:</strong> one independent clause with at least one dependent (subordinate) clause (e.g., starting with because, although, when, if, who/which/that).</p>
+        <p><strong>Minor:</strong> an incomplete clause used communicatively (e.g., headlines, interjections, directives with ellipsis): <em>Silence, please.</em> / <em>No phones.</em> / <em>Thanks!</em></p>
+      </div>
+    </details>
+
+    <footer class="muted">
+      Built for large classroom displays • Keyboard & touch friendly • No data leaves the browser.
+    </footer>
+
+    <div id="aria-feedback" class="sr-only" aria-live="polite"></div>
+  </div>
+
+  <script>
+    // ======= Data =======
+    const DEFAULT_SENTENCES = [
+      // SIMPLE
+      { text: "The rain stopped.", type: "simple" },
+      { text: "Students revised quietly.", type: "simple" },
+      { text: "The server crashed.", type: "simple" },
+      { text: "Her explanation makes sense.", type: "simple" },
+      { text: "Lightning flashed overhead.", type: "simple" },
+
+      // COMPOUND
+      { text: "The sun set, and the stars appeared.", type: "compound" },
+      { text: "He wanted to join, but he missed the deadline.", type: "compound" },
+      { text: "You can email me, or you can post on Teams.", type: "compound" },
+      { text: "We tried our best; the result was disappointing.", type: "compound" },
+      { text: "Finish the report, and send it to the group.", type: "compound" },
+
+      // COMPLEX
+      { text: "Because the traffic was heavy, we missed the start.", type: "complex" },
+      { text: "I’ll reply when I’ve marked your work.", type: "complex" },
+      { text: "The book that you recommended was excellent.", type: "complex" },
+      { text: "Although it was late, they continued working.", type: "complex" },
+      { text: "If you revise consistently, you will improve.", type: "complex" },
+
+      // MINOR
+      { text: "No phones.", type: "minor" },
+      { text: "On your marks!", type: "minor" },
+      { text: "What a day!", type: "minor" },
+      { text: "Silence, please.", type: "minor" },
+      { text: "Yes.", type: "minor" },
+    ];
+
+    const TYPE_INFO = {
+      simple: "Simple: one independent clause (no dependent clauses).",
+      compound: "Compound: two or more independent clauses joined with a coordinating conjunction or a semicolon.",
+      complex: "Complex: an independent clause with at least one dependent clause.",
+      minor: "Minor: an elliptical or fragmentary sentence used communicatively (e.g., interjection, headline, directive)."
+    };
+
+    const LS_KEY = "sentenceClassifier.custom.v1";
+
+    // ======= State =======
+    let items = [];
+    let order = [];
+    let index = 0;
+    let score = 0;
+    let answered = false;
+
+    // ======= Helpers =======
+    const $ = sel => document.querySelector(sel);
+    const $$ = sel => Array.from(document.querySelectorAll(sel));
+
+    function shuffle(a) {
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function normaliseType(s) {
+      return (s || "").toString().trim().toLowerCase();
+    }
+
+    function validItem(o) {
+      const t = normaliseType(o.type);
+      return o && typeof o.text === "string" &&
+             ["simple", "compound", "complex", "minor"].includes(t);
+    }
+
+    function parseLinesToItems(text) {
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      const out = [];
+      for (const line of lines) {
+        // Split on last comma to allow commas in sentences.
+        const lastComma = line.lastIndexOf(",");
+        if (lastComma === -1) continue;
+        const sent = line.slice(0, lastComma).trim();
+        const type = normaliseType(line.slice(lastComma + 1));
+        const obj = { text: sent, type };
+        if (validItem(obj)) out.push(obj);
+      }
+      return out;
+    }
+
+    function saveCustom(text) {
+      localStorage.setItem(LS_KEY, text);
+    }
+    function loadCustomRaw() {
+      return localStorage.getItem(LS_KEY);
+    }
+    function loadItems() {
+      const raw = loadCustomRaw();
+      if (raw) {
+        const parsed = parseLinesToItems(raw);
+        if (parsed.length >= 4) return parsed; // need at least one per category ideally, but 4 minimum is okay.
+      }
+      return [...DEFAULT_SENTENCES];
+    }
+
+    // ======= UI Update =======
+    function updateMeta() {
+      $("#score").textContent = `Score: ${score}`;
+      $("#progressText").textContent = `${Math.min(index + 1, items.length)} / ${items.length}`;
+      $("#progressBar").max = items.length;
+      $("#progressBar").value = index;
+    }
+
+    function setSentence(s) {
+      $("#sentence").textContent = s;
+    }
+
+    function setButtonsEnabled(enabled) {
+      $$(".class-btn").forEach(b => b.disabled = !enabled);
+    }
+
+    function resetButtonStyles() {
+      $$(".class-btn").forEach(b => b.classList.remove("correct", "incorrect"));
+    }
+
+    function showFeedback(correct, chosen, actual) {
+      const box = $("#feedback");
+      const res = $("#resultText");
+      const ex = $("#explain");
+      box.hidden = false;
+      box.classList.toggle("correct", correct);
+      box.classList.toggle("wrong", !correct);
+
+      if (correct) {
+        res.innerHTML = `✅ Correct <span class="pill correct">${actual.toUpperCase()}</span>`;
+      } else {
+        res.innerHTML = `❌ Not quite — it’s <span class="pill wrong">${actual.toUpperCase()}</span>`;
+      }
+      ex.textContent = TYPE_INFO[actual] || "";
+      $("#aria-feedback").textContent = correct ? "Correct" : `Incorrect. Correct answer: ${actual}`;
+    }
+
+    function hideFeedback() {
+      $("#feedback").hidden = true;
+    }
+
+    function renderCurrent() {
+      if (index >= items.length) {
+        // Finished
+        setSentence("All done!");
+        setButtonsEnabled(false);
+        hideFeedback();
+        $("#progressText").textContent = `${items.length} / ${items.length}`;
+        $("#progressBar").value = items.length;
+        $("#nextBtn").disabled = true;
+
+        const percent = Math.round((score / items.length) * 100);
+        const summary = document.createElement("div");
+        summary.className = "feedback";
+        summary.innerHTML = `<strong>Summary</strong><div>You scored ${score} / ${items.length} (${percent}%).</div>`;
+        document.querySelector(".panel").appendChild(summary);
+        return;
+      }
+
+      const item = items[order[index]];
+      setSentence(item.text);
+      updateMeta();
+      setButtonsEnabled(true);
+      $("#nextBtn").disabled = true;
+      hideFeedback();
+      resetButtonStyles();
+      answered = false;
+    }
+
+    // ======= Flow =======
+    function startSession() {
+      items = loadItems();
+      order = shuffle([...Array(items.length).keys()]);
+      index = 0;
+      score = 0;
+      answered = false;
+      // Remove any summary feedback if present
+      $$(".panel .feedback").forEach((el, i) => {
+        if (i > 0) el.remove(); // keep the main feedback box
+      });
+      renderCurrent();
+    }
+
+    function reshuffleRemaining() {
+      if (index >= items.length - 1) return;
+      const remaining = order.slice(index);
+      shuffle(remaining);
+      order = [...order.slice(0, index), ...remaining];
+      $("#aria-feedback").textContent = "Remaining items reshuffled";
+    }
+
+    // ======= Event Handlers =======
+    $$(".class-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        if (answered) return;
+        const choice = btn.dataset.choice;
+        const actual = items[order[index]].type;
+        const correct = choice === actual;
+        answered = true;
+
+        // Visual mark
+        $$(".class-btn").forEach(b => {
+          if (b.dataset.choice === actual) b.classList.add("correct");
+        });
+        if (!correct) btn.classList.add("incorrect");
+
+        if (correct) score++;
+        showFeedback(correct, choice, actual);
+        setButtonsEnabled(false);
+        $("#nextBtn").disabled = false;
+        updateMeta();
+      });
+    });
+
+    $("#nextBtn").addEventListener("click", () => {
+      if (!answered) return;
+      index++;
+      renderCurrent();
+    });
+
+    $("#reshuffleBtn").addEventListener("click", () => {
+      reshuffleRemaining();
+    });
+
+    // Keyboard shortcuts
+    window.addEventListener("keydown", (e) => {
+      const map = { "1": "simple", "2": "compound", "3": "complex", "4": "minor" };
+      if (map[e.key]) {
+        const btn = document.querySelector(`.class-btn[data-choice="${map[e.key]}"]`);
+        if (btn && !btn.disabled) btn.click();
+      }
+      if (e.key === "Enter" && !$("#nextBtn").disabled) $("#nextBtn").click();
+    });
+
+    // Theme toggle
+    const root = document.documentElement;
+    const themeBtn = $("#themeBtn");
+    function setTheme(mode) {
+      root.setAttribute("data-theme", mode);
+      themeBtn.textContent = mode === "dark" ? "☀️ Light" : "🌙 Dark";
+      localStorage.setItem("sentenceClassifier.theme", mode);
+    }
+    themeBtn.addEventListener("click", () => {
+      const now = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      setTheme(now);
+    });
+
+    // Fullscreen toggle
+    $("#fsBtn").addEventListener("click", async () => {
+      const el = document.getElementById("app");
+      if (!document.fullscreenElement) {
+        try { await el.requestFullscreen(); } catch {}
+      } else {
+        await document.exitFullscreen();
+      }
+    });
+
+    // Restart
+    $("#restartBtn").addEventListener("click", () => startSession());
+
+    // Teacher panel actions
+    $("#loadCustom").addEventListener("click", () => {
+      const text = $("#customInput").value;
+      const parsed = parseLinesToItems(text);
+      const status = $("#customStatus");
+      if (parsed.length < 1) {
+        status.textContent = "No valid lines found. Check format: sentence, type";
+        return;
+      }
+      items = parsed;
+      order = shuffle([...Array(items.length).keys()]);
+      index = 0;
+      score = 0;
+      renderCurrent();
+      status.textContent = `Loaded ${parsed.length} sentences (unsaved)`;
+    });
+
+    $("#saveCustom").addEventListener("click", () => {
+      const text = $("#customInput").value;
+      const parsed = parseLinesToItems(text);
+      const status = $("#customStatus");
+      if (parsed.length < 1) {
+        status.textContent = "Nothing to save (no valid lines).";
+        return;
+      }
+      saveCustom(text);
+      status.textContent = `Saved ${parsed.length} to this browser.`;
+    });
+
+    $("#clearCustom").addEventListener("click", () => {
+      localStorage.removeItem(LS_KEY);
+      $("#customStatus").textContent = "Cleared saved set; using defaults.";
+      startSession();
+    });
+
+    // ======= Init =======
+    (function init() {
+      // theme
+      const savedTheme = localStorage.getItem("sentenceClassifier.theme") || "light";
+      setTheme(savedTheme);
+      // Load saved custom to textarea preview
+      const savedRaw = loadCustomRaw();
+      if (savedRaw) $("#customInput").value = savedRaw;
+
+      startSession();
+    })();
+  </script>
+</body>
+</html>

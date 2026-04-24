@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Flashcards Viewer</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #f4f4f4;
+      padding: 30px;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+    }
+
+    #flashcard {
+      font-size: 2rem;
+      background: white;
+      border: 2px solid #333;
+      padding: 40px 60px;
+      margin: 30px auto;
+      width: fit-content;
+      border-radius: 8px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    }
+
+    button {
+      margin: 10px;
+      padding: 10px 20px;
+      font-size: 1rem;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .mode-btn {
+      background-color: #007BFF;
+      color: white;
+    }
+
+    .next-btn {
+      background-color: #28A745;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Flashcards Viewer</h1>
+
+  <div>
+    <button class="mode-btn" onclick="setMode('single')">Single Card Mode</button>
+    <button class="mode-btn" onclick="setMode('pair')">Pair Mode</button>
+  </div>
+
+  <div id="flashcard">Click a mode to start</div>
+
+  <button class="next-btn" onclick="showNext()">Next</button>
+
+  <script>
+    const flashcards = [
+      "Adventure", "Romance",
+      "Biography", "Crime",
+      "Dramatic Monologue", "Short Story",
+      "Diary", "Horror",
+      "Sci-fi", "Fantasy",
+      "TV Series", "Children’s Book",
+      "Comic", "Comedy",
+      "Videogame Narrative", "Epic"
+    ];
+
+    let mode = null;
+    let queue = [];
+
+    function setMode(selectedMode) {
+      mode = selectedMode;
+      generateQueue();
+      showNext();
+    }
+
+    function generateQueue() {
+      const shuffled = [...flashcards];
+      // Fisher-Yates shuffle
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+
+      if (mode === 'single') {
+        queue = shuffled;
+      } else if (mode === 'pair') {
+        // Create pairs from shuffled list
+        queue = [];
+        for (let i = 0; i < shuffled.length; i += 2) {
+          if (i + 1 < shuffled.length) {
+            queue.push([shuffled[i], shuffled[i + 1]]);
+          }
+        }
+      }
+    }
+
+    function showNext() {
+      if (queue.length === 0) {
+        document.getElementById('flashcard').textContent = "Done! Click mode to restart.";
+        return;
+      }
+
+      const current = queue.shift();
+      const display = Array.isArray(current) ? current.join(" + ") : current;
+      document.getElementById('flashcard').textContent = display;
+    }
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,603 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Idea Board — Drag & Group</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --grid: 24px;
+      --accent: #0a68ff; /* Microsoft-ish blue */
+      --paper: #fffbe6;
+      --paper-border: #e2cf86;
+      --toolbar-h: 68px;
+    }
+
+    /* Reset + base */
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+      color: #222;
+      background: #fafafa;
+    }
+
+    /* Workspace (board) */
+    #board {
+      position: fixed;
+      inset: 0 0 var(--toolbar-h) 0; /* top, right, bottom, left */
+      overflow: hidden;
+      background:
+        linear-gradient(0deg, rgba(0,0,0,0.04) 1px, transparent 1px) 0 0 / 100% var(--grid),
+        linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px) 0 0 / var(--grid) 100%,
+        radial-gradient(1200px 1200px at 50% 50%, #ffffff, #f4f7fb);
+    }
+
+    /* Toolbar */
+    #toolbar {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      height: var(--toolbar-h);
+      background: #fff;
+      border-top: 1px solid #e6e6e6;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 12px;
+    }
+    #entry {
+      flex: 1;
+      height: 44px;
+      padding: 10px 12px;
+      border: 1px solid #cfd7e4;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+    #addBtn, #importBtn, #exportBtn, #clearBtn {
+      height: 44px;
+      padding: 0 14px;
+      border: 1px solid #cfd7e4;
+      background: #f7f9fc;
+      border-radius: 8px;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    #addBtn { background: #eaf3ff; border-color: #b7d2ff; }
+    #addBtn:hover { background: #dbeaff; }
+    #exportBtn:hover, #importBtn:hover, #clearBtn:hover { background: #eef2f7; }
+
+    label.small {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #555;
+      margin-left: auto;
+      user-select: none;
+    }
+
+    /* Cards (slips) */
+    .card {
+      position: absolute;
+      max-width: 280px;
+      background: var(--paper);
+      border: 1px solid var(--paper-border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      box-shadow: 0 1px 0 rgba(0,0,0,0.06), 0 4px 10px rgba(0,0,0,0.06);
+      cursor: grab;
+      user-select: none;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      transition: box-shadow 120ms ease, transform 120ms ease;
+      animation: pop-in 160ms ease-out;
+
+      /* 🔧 Default text size — tweak this value to taste */
+      font-size: 20px;   /* e.g., 18px, 20px, 24px */
+      line-height: 1.25; /* optional: improves readability */
+    }
+    .card:active { cursor: grabbing; }
+    .card.selected {
+      outline: 2px dashed var(--accent);
+      outline-offset: 2px;
+    }
+    @keyframes pop-in {
+      from { transform: scale(0.9); opacity: 0; }
+      to   { transform: scale(1.0); opacity: 1; }
+    }
+
+    /* Marquee (drag-box) selection */
+    .marquee {
+      position: absolute;
+      border: 1px dashed var(--accent);
+      background: rgba(10, 104, 255, 0.12);
+      pointer-events: none;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="board" aria-label="Workspace" role="application">
+    <div id="marquee" class="marquee" aria-hidden="true"></div>
+  </div>
+
+  <div id="toolbar" role="group" aria-label="Controls">
+    <input id="entry" type="text" placeholder="Type words or comma‑separated phrases, then press Enter…" aria-label="Add words or phrases" />
+    <button id="addBtn" title="Add to board">Add</button>
+    <button id="importBtn" title="Import CSV">Import</button>
+    <button id="exportBtn" title="Export CSV">Export</button>
+    <button id="clearBtn" title="Remove all">Clear</button>
+    <label class="small"><input type="checkbox" id="snap" /> Snap to grid</label>
+    <input id="fileInput" type="file" accept=".csv,text/csv" hidden />
+  </div>
+
+  <script>
+    (() => {
+      const board     = document.getElementById('board');
+      const marqueeEl = document.getElementById('marquee');
+      const entry     = document.getElementById('entry');
+      const addBtn    = document.getElementById('addBtn');
+      const importBtn = document.getElementById('importBtn');
+      const exportBtn = document.getElementById('exportBtn');
+      const clearBtn  = document.getElementById('clearBtn');
+      const snapChk   = document.getElementById('snap');
+      const fileInput = document.getElementById('fileInput');
+
+      const GRID = 24;
+      let zCounter = 10;
+      let dragging = null;            // { anchor, pointerId, members: [...], offsets: [...] }
+      let selectedCards = new Set();  // multi-select
+      let marquee = null;             // {startX, startY, curX, curY, addMode}
+
+      /** Helpers **/
+      function splitInputToItems(text) {
+        // First version behavior: split on commas only
+        return text
+          .split(",")
+          .map(s => s.trim())
+          .filter(s => s.length > 0);
+      }
+      function clamp(val, min, max) { return Math.max(min, Math.min(max, val)); }
+      function snap(n) { return Math.round(n / GRID) * GRID; }
+      function csvEscape(field) {
+        const s = String(field).replace(/"/g, '""');
+        return `"${s}"`;
+      }
+
+      /** Simple CSV parser supporting quoted fields and commas **/
+      function parseCSV(text) {
+        const rows = [];
+        let row = [];
+        let cur = '';
+        let inQuotes = false;
+
+        for (let i = 0; i < text.length; i++) {
+          const ch = text[i];
+
+          if (inQuotes) {
+            if (ch === '"') {
+              const next = text[i + 1];
+              if (next === '"') { cur += '"'; i++; }  // escaped quote
+              else { inQuotes = false; }
+            } else {
+              cur += ch;
+            }
+          } else {
+            if (ch === '"') {
+              inQuotes = true;
+            } else if (ch === ',') {
+              row.push(cur); cur = '';
+            } else if (ch === '\r') {
+              // ignore, rely on \n
+            } else if (ch === '\n') {
+              row.push(cur); rows.push(row);
+              row = []; cur = '';
+            } else {
+              cur += ch;
+            }
+          }
+        }
+        // last field
+        row.push(cur);
+        rows.push(row);
+
+        // Trim potential trailing blank line
+        if (rows.length && rows[rows.length - 1].length === 1 && rows[rows.length - 1][0] === '') {
+          rows.pop();
+        }
+        return rows;
+      }
+
+      /** Selection utils **/
+      function clearSelection() {
+        selectedCards.forEach(c => c.classList.remove('selected'));
+        selectedCards.clear();
+      }
+      function addToSelection(card) {
+        if (!selectedCards.has(card)) {
+          selectedCards.add(card);
+          card.classList.add('selected');
+          card.style.zIndex = ++zCounter;
+        }
+      }
+      function removeFromSelection(card) {
+        if (selectedCards.has(card)) {
+          selectedCards.delete(card);
+          card.classList.remove('selected');
+        }
+      }
+      function replaceSelection(cards) {
+        clearSelection();
+        cards.forEach(addToSelection);
+      }
+
+      /** Create a card element and place it on the board **/
+      function createCard(text, x = null, y = null) {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.textContent = text;
+
+        // Position: if not provided, place near centre-ish with slight jitter
+        const bRect = board.getBoundingClientRect();
+        const defaultX = Math.random() * (bRect.width * 0.6) + (bRect.width * 0.2);
+        const defaultY = Math.random() * (bRect.height * 0.6) + (bRect.height * 0.2);
+
+        // Apply snap if checkbox is checked
+        let px = (x == null ? defaultX : x);
+        let py = (y == null ? defaultY : y);
+        if (snapChk.checked) {
+          px = snap(px); py = snap(py);
+        }
+
+        // Temporarily set to compute size for clamping
+        card.style.left = "0px";
+        card.style.top  = "0px";
+        board.appendChild(card);
+
+        const cRect = card.getBoundingClientRect();
+        px = clamp(px, 0, bRect.width  - cRect.width);
+        py = clamp(py, 0, bRect.height - cRect.height);
+
+        card.style.left = `${px}px`;
+        card.style.top  = `${py}px`;
+        card.style.zIndex = ++zCounter;
+
+        // Interactions
+        card.addEventListener('pointerdown', (e) => {
+          const multiKey = e.ctrlKey || e.metaKey; // Ctrl (Windows/Linux) or Cmd (macOS)
+
+          // Toggle selection with Ctrl/Cmd; otherwise select only this card
+          if (multiKey) {
+            if (selectedCards.has(card)) removeFromSelection(card);
+            else addToSelection(card);
+          } else {
+            if (!selectedCards.has(card)) replaceSelection([card]);
+            else {
+              // keep current selection if clicking a selected card
+            }
+          }
+
+          // If nothing selected, do not start dragging
+          if (selectedCards.size === 0) return;
+
+          // Start group drag anchored on the clicked card
+          dragging = {
+            anchor: card,
+            pointerId: e.pointerId,
+            members: Array.from(selectedCards),
+            offsets: []
+          };
+          // Capture pointer on anchor for smoother events
+          dragging.anchor.setPointerCapture(e.pointerId);
+
+          const bRect = board.getBoundingClientRect();
+          dragging.members.forEach(c => {
+            const rect = c.getBoundingClientRect();
+            dragging.offsets.push({
+              card: c,
+              // Pointer-to-card offsets (so each card follows pointer consistently)
+              offsetX: e.clientX - rect.left,
+              offsetY: e.clientY - rect.top,
+              width: rect.width,
+              height: rect.height
+            });
+            c.style.boxShadow = '0 2px 1px rgba(0,0,0,0.06), 0 8px 20px rgba(0,0,0,0.12)';
+            c.style.zIndex = ++zCounter;
+          });
+        });
+
+        card.addEventListener('dblclick', () => {
+          const t = prompt('Edit text', card.textContent);
+          if (t !== null) {
+            const newText = t.trim();
+            if (newText.length > 0) card.textContent = newText;
+          }
+        });
+
+        return card;
+      }
+
+      /** Board: marquee selection **/
+      board.addEventListener('pointerdown', (e) => {
+        // If pointerdown is on a card, card's listener handles it
+        if (e.target.classList.contains('card')) return;
+
+        // Start marquee on empty space
+        const bRect = board.getBoundingClientRect();
+        marquee = {
+          startX: e.clientX - bRect.left,
+          startY: e.clientY - bRect.top,
+          curX: e.clientX - bRect.left,
+          curY: e.clientY - bRect.top,
+          addMode: (e.shiftKey || e.ctrlKey || e.metaKey)
+        };
+        marqueeEl.style.display = 'block';
+        marqueeEl.style.left = `${marquee.startX}px`;
+        marqueeEl.style.top  = `${marquee.startY}px`;
+        marqueeEl.style.width  = `0px`;
+        marqueeEl.style.height = `0px`;
+      });
+
+      board.addEventListener('pointermove', (e) => {
+        // Group dragging
+        if (dragging) {
+          const bRect = board.getBoundingClientRect();
+          dragging.offsets.forEach(info => {
+            let x = e.clientX - bRect.left - info.offsetX;
+            let y = e.clientY - bRect.top  - info.offsetY;
+
+            // Clamp inside board for each card
+            x = clamp(x, 0, bRect.width - info.width);
+            y = clamp(y, 0, bRect.height - info.height);
+
+            if (snapChk.checked) { x = snap(x); y = snap(y); }
+            info.card.style.left = `${x}px`;
+            info.card.style.top  = `${y}px`;
+          });
+          return;
+        }
+
+        // Marquee dragging
+        if (marquee) {
+          const bRect = board.getBoundingClientRect();
+          marquee.curX = e.clientX - bRect.left;
+          marquee.curY = e.clientY - bRect.top;
+
+          const left = Math.min(marquee.startX, marquee.curX);
+          const top  = Math.min(marquee.startY, marquee.curY);
+          const width  = Math.abs(marquee.curX - marquee.startX);
+          const height = Math.abs(marquee.curY - marquee.startY);
+
+          marqueeEl.style.left = `${left}px`;
+          marqueeEl.style.top  = `${top}px`;
+          marqueeEl.style.width  = `${width}px`;
+          marqueeEl.style.height = `${height}px`;
+          return;
+        }
+      });
+
+      ['pointerup', 'pointercancel'].forEach(evt => {
+        board.addEventListener(evt, (e) => {
+          // Finish group dragging
+          if (dragging) {
+            try { dragging.anchor.releasePointerCapture(dragging.pointerId || 0); } catch {}
+            dragging.members.forEach(c => {
+              c.style.boxShadow = '0 1px 0 rgba(0,0,0,0.06), 0 4px 10px rgba(0,0,0,0.06)';
+            });
+            dragging = null;
+          }
+
+          // Finish marquee selection
+          if (marquee) {
+            marqueeEl.style.display = 'none';
+
+            const bRect = board.getBoundingClientRect();
+            const left = Math.min(marquee.startX, marquee.curX);
+            const top  = Math.min(marquee.startY, marquee.curY);
+            const right = Math.max(marquee.startX, marquee.curX);
+            const bottom= Math.max(marquee.startY, marquee.curY);
+
+            const inBox = [];
+            document.querySelectorAll('.card').forEach(card => {
+              const r = card.getBoundingClientRect();
+              const cx1 = r.left - bRect.left;
+              const cy1 = r.top  - bRect.top;
+              const cx2 = cx1 + r.width;
+              const cy2 = cy1 + r.height;
+              const intersects = !(cx2 < left || cx1 > right || cy2 < top || cy1 > bottom);
+              if (intersects) inBox.push(card);
+            });
+
+            if (marquee.addMode) {
+              inBox.forEach(addToSelection);
+            } else {
+              replaceSelection(inBox);
+            }
+
+            marquee = null;
+          }
+        });
+      });
+
+      /** Keyboard: Delete & arrow nudge (multi-select aware) **/
+      window.addEventListener('keydown', (e) => {
+        // If typing in the entry field, let it handle keys
+        if (document.activeElement === entry) return;
+
+        const step = e.shiftKey ? GRID : 4;
+
+        switch (e.key) {
+          case 'Delete':
+          case 'Backspace':
+            if (selectedCards.size > 0) {
+              selectedCards.forEach(c => c.remove());
+              selectedCards.clear();
+              e.preventDefault();
+            }
+            break;
+          case 'a':
+          case 'A':
+            if (e.ctrlKey || e.metaKey) {
+              // Ctrl/Cmd + A: select all cards
+              replaceSelection(Array.from(document.querySelectorAll('.card')));
+              e.preventDefault();
+            }
+            break;
+          case 'ArrowLeft':
+          case 'ArrowRight':
+          case 'ArrowUp':
+          case 'ArrowDown': {
+            if (selectedCards.size === 0) return;
+            const bRect = board.getBoundingClientRect();
+            selectedCards.forEach(sel => {
+              const left = parseInt(sel.style.left || '0', 10);
+              const top  = parseInt(sel.style.top  || '0', 10);
+              const rect = sel.getBoundingClientRect();
+
+              let newLeft = left;
+              let newTop  = top;
+              if (e.key === 'ArrowLeft')  newLeft = Math.max(0, left - step);
+              if (e.key === 'ArrowRight') newLeft = Math.min(bRect.width - rect.width, left + step);
+              if (e.key === 'ArrowUp')    newTop  = Math.max(0, top  - step);
+              if (e.key === 'ArrowDown')  newTop  = Math.min(bRect.height - rect.height, top + step);
+
+              if (snapChk.checked) {
+                newLeft = snap(newLeft);
+                newTop  = snap(newTop);
+              }
+              sel.style.left = `${newLeft}px`;
+              sel.style.top  = `${newTop}px`;
+            });
+            e.preventDefault();
+            break;
+          }
+          default: break;
+        }
+      });
+
+      /** Add items from input (commas only, original behavior) **/
+      function addFromEntry() {
+        const items = splitInputToItems(entry.value);
+        if (items.length === 0) return;
+        items.forEach(txt => createCard(txt));
+        entry.value = '';
+        entry.focus();
+      }
+      entry.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          addFromEntry();
+        }
+      });
+      addBtn.addEventListener('click', addFromEntry);
+
+      /** Export CSV: headers + rows [text, x, y] **/
+      exportBtn.addEventListener('click', () => {
+        const rows = [['text', 'x', 'y']];
+        document.querySelectorAll('.card').forEach(card => {
+          const x = parseInt(card.style.left || '0', 10);
+          const y = parseInt(card.style.top  || '0', 10);
+          rows.push([card.textContent, x, y]);
+        });
+        const csv = rows.map(r => r.map(csvEscape).join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const date = new Date().toISOString().slice(0,10);
+        a.download = `idea-board-${date}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 500);
+      });
+
+      /** Clear all **/
+      clearBtn.addEventListener('click', () => {
+        if (confirm('Remove all items from the board?')) {
+          document.querySelectorAll('.card').forEach(c => c.remove());
+          clearSelection();
+        }
+      });
+
+      /** Import CSV (append or replace) **/
+      function importCSVText(text) {
+        const rowsRaw = parseCSV(text);
+        if (rowsRaw.length === 0) {
+          alert('No rows found in CSV.');
+          return;
+        }
+        // Detect header
+        const header = rowsRaw[0].map(h => String(h).trim().toLowerCase());
+        let startIdx = 0;
+        let textIdx = -1, xIdx = -1, yIdx = -1;
+
+        if (header.includes('text') || header.includes('x') || header.includes('y')) {
+          textIdx = header.indexOf('text');
+          xIdx = header.indexOf('x');
+          yIdx = header.indexOf('y');
+          startIdx = 1;
+        }
+
+        const append = confirm('Import: Click OK to append to current board. Click Cancel to replace.');
+        if (!append) {
+          document.querySelectorAll('.card').forEach(c => c.remove());
+          clearSelection();
+        }
+
+        for (let i = startIdx; i < rowsRaw.length; i++) {
+          const r = rowsRaw[i];
+          if (!r) continue;
+
+          if (textIdx >= 0) {
+            const t = (r[textIdx] ?? '').trim();
+            if (!t) continue;
+            const x = xIdx >= 0 ? parseFloat(r[xIdx]) : null;
+            const y = yIdx >= 0 ? parseFloat(r[yIdx]) : null;
+            createCard(t, isFinite(x) ? x : null, isFinite(y) ? y : null);
+          } else {
+            // No headers: treat first column as text
+            const t = (r[0] ?? '').trim();
+            if (!t) continue;
+            createCard(t, null, null);
+          }
+        }
+      }
+
+      importBtn.addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => importCSVText(reader.result);
+        reader.readAsText(file);
+        fileInput.value = '';
+      });
+
+      /** Drag & drop CSV onto the board to import **/
+      board.addEventListener('dragover', (e) => {
+        if (e.dataTransfer && e.dataTransfer.types.includes('Files')) {
+          e.preventDefault();
+        }
+      });
+      board.addEventListener('drop', (e) => {
+        if (!(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length)) return;
+        e.preventDefault();
+        const file = e.dataTransfer.files[0];
+        if (!file.name.toLowerCase().endsWith('.csv')) {
+          alert('Please drop a .csv file to import.');
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => importCSVText(reader.result);
+        reader.readAsText(file);
+      });
+
+      /** Initial focus for speedy entry **/
+      entry.focus();
+    })();
+  </script>
+</body>
+</html>
+``

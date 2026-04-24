@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Classroom Exercise: Cohesion I (Light Mode)</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: #ffffff;
+            color: #24292e;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 50px 20px;
+            margin: 0;
+        }
+        h1 { font-size: 3.5rem; color: #0366d6; margin-bottom: 10px; }
+        p.subtitle { font-size: 1.8rem; margin-bottom: 40px; color: #586069; }
+        
+        #sortable-list {
+            list-style: none;
+            padding: 0;
+            width: 100%;
+            max-width: 1200px;
+        }
+        
+        .sentence-card {
+            background-color: #f6f8fa;
+            border: 3px solid #e1e4e8;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            padding: 30px;
+            font-size: 2.5rem; 
+            font-weight: 600;
+            cursor: grab;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+
+        .sentence-card:active { cursor: grabbing; transform: scale(1.02); }
+        .sentence-card.dragging { opacity: 0.4; background-color: #dbedff; border-color: #0366d6; }
+
+        .btn-container { margin-top: 50px; display: flex; gap: 30px; }
+        
+        button {
+            padding: 25px 50px;
+            font-size: 2rem;
+            font-weight: bold;
+            border: 2px solid rgba(0,0,0,0.1);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        #check-btn { background-color: #2ea44f; color: white; }
+        #check-btn:hover { opacity: 0.9; }
+        
+        #reset-btn { background-color: #d73a49; color: white; }
+        #reset-btn:hover { opacity: 0.9; }
+        
+        #feedback {
+            margin-top: 40px;
+            font-size: 3rem;
+            font-weight: bold;
+            min-height: 1.5em;
+        }
+
+        .correct-state { border-color: #2ea44f !important; background-color: #dcffe4 !important; color: #1a7f37 !important; }
+        .wrong-state { border-color: #d73a49 !important; background-color: #ffeef0 !important; color: #b31d28 !important; }
+    </style>
+</head>
+<body>
+
+    <h1>Cohesion Challenge</h1>
+    <p class="subtitle">Drag the sentences into a logical sequence.</p>
+
+    <ul id="sortable-list"></ul>
+
+    <div class="btn-container">
+        <button id="check-btn">Check Order</button>
+        <button id="reset-btn" onclick="location.reload()">Reset / Shuffle</button>
+    </div>
+
+    <div id="feedback"></div>
+
+<script>
+    const correctOrder = [
+        "John looked out of the window.",
+        "He thought he saw a shape in the bushes.",
+        "Dark, strange and furtive.",
+        "Could it be a fox?",
+        "Mary had told him about the foxes.",
+        "However, nobody had seen one for months."
+    ];
+
+    const list = document.getElementById('sortable-list');
+    const feedback = document.getElementById('feedback');
+
+    function init() {
+        let shuffled = [...correctOrder].sort(() => Math.random() - 0.5);
+        shuffled.forEach(text => {
+            const li = document.createElement('li');
+            li.className = 'sentence-card';
+            li.draggable = true;
+            li.textContent = text;
+            list.appendChild(li);
+        });
+    }
+
+    list.addEventListener('dragstart', (e) => e.target.classList.add('dragging'));
+    list.addEventListener('dragend', (e) => {
+        e.target.classList.remove('dragging');
+        clearStatus();
+    });
+
+    list.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const afterElement = getDragAfterElement(list, e.clientY);
+        const dragging = document.querySelector('.dragging');
+        if (afterElement == null) {
+            list.appendChild(dragging);
+        } else {
+            list.insertBefore(dragging, afterElement);
+        }
+    });
+
+    function getDragAfterElement(container, y) {
+        const draggableElements = [...container.querySelectorAll('.sentence-card:not(.dragging)')];
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
+    document.getElementById('check-btn').addEventListener('click', () => {
+        const currentElements = [...document.querySelectorAll('.sentence-card')];
+        let win = true;
+
+        currentElements.forEach((el, i) => {
+            if (el.textContent === correctOrder[i]) {
+                el.classList.add('correct-state');
+                el.classList.remove('wrong-state');
+            } else {
+                el.classList.add('wrong-state');
+                el.classList.remove('correct-state');
+                win = false;
+            }
+        });
+
+        if (win) {
+            feedback.textContent = "✔ Narrative Restored!";
+            feedback.style.color = "#2ea44f";
+        } else {
+            feedback.textContent = "Check your links!";
+            feedback.style.color = "#d73a49";
+        }
+    });
+
+    function clearStatus() {
+        document.querySelectorAll('.sentence-card').forEach(el => {
+            el.classList.remove('correct-state', 'wrong-state');
+        });
+        feedback.textContent = "";
+    }
+
+    init();
+</script>
+
+</body>
+</html>

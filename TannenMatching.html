@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tannen — Oppositions Checking</title>
+
+<style>
+    :root{
+        --bg:#f7f8fb; --fg:#222;
+        --panel:#ffffff; --border:#ddd;
+        --muted:#6b7280;
+        --blue:#2563eb; --blue-h:#1e4fc7;
+        --green:#10b981; --green-h:#0d9168;
+        --slate:#6b7280; --slate-h:#4b5563;
+        --amber:#fbbf24; --amber-h:#d89f1e;15:44 10/02/2026
+        --tile:#eef3ff; --tile-b:#9db4ff;
+        --ok:#16a34a; --bad:#dc2626;
+    }
+    body {
+        font-family: system-ui, Segoe UI, Roboto, Arial, sans-serif;
+        background: var(--bg);
+        margin: 0;
+        padding: 1rem;
+        font-size: 20px;
+        color: var(--fg);
+    }
+
+    /* --------- Controls (prettified buttons) --------- */
+    .controls {
+        display: flex;
+        gap: .7rem;
+        margin: .6rem 0 1rem;
+        flex-wrap: wrap;
+    }
+    .btn {
+        padding: .55rem 1.1rem;
+        border: none;
+        border-radius: 12px;
+        font-size: 1rem;
+        cursor: pointer;
+        font-weight: 700;
+        transition: .18s ease-in-out;
+        box-shadow: 0 1px 0 #00000010;
+    }
+    .btn:focus { outline: 3px solid #0000; }
+    .btn-check   { background: var(--blue);  color: #fff; }
+    .btn-check:hover { background: var(--blue-h); transform: translateY(-1px); }
+    .btn-reveal  { background: var(--green); color: #fff; }
+    .btn-reveal:hover { background: var(--green-h); transform: translateY(-1px); }
+    .btn-hide    { background: var(--slate); color: #fff; }
+    .btn-hide:hover { background: var(--slate-h); transform: translateY(-1px); }
+    .btn-reset   { background: var(--amber); color: #222; }
+    .btn-reset:hover { background: var(--amber-h); transform: translateY(-1px); }
+
+    /* --------- Label Pool --------- */
+    .pool {
+        display: flex;
+        gap: .5rem;
+        flex-wrap: wrap;
+        border: 1px dashed #ccc;
+        padding: .6rem;
+        border-radius: 12px;
+        background: #fff;
+        margin-bottom: 1rem;
+    }
+    .tile {
+        background: var(--tile);
+        border: 1px solid var(--tile-b);
+        padding: .5rem .85rem;
+        border-radius: 10px;
+        cursor: grab;
+        user-select: none;
+        font-weight: 600;
+        color: #1e3a8a;
+    }
+
+    /* --------- Carousel / Cards --------- */
+    .carousel {
+        display: flex;
+        gap: 1rem;
+        overflow-x: auto;
+        padding: 1rem;
+        scroll-behavior: smooth;
+    }
+    .card {
+        flex: 0 0 500px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 1rem;
+        box-shadow: 0 2px 10px #00000010;
+    }
+
+    /* --------- Slots --------- */
+    .slots {
+        display: flex;
+        gap: .6rem;
+        margin-bottom: 1rem;
+        font-weight: 800;
+        align-items: center;
+    }
+    .droppable {
+        min-height: 52px;
+        min-width: 170px;
+        border: 2px dashed #aaa;
+        border-radius: 12px;
+        background: #f3f4f6;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #666;
+    }
+    .correct {
+        border-color: var(--ok) !important;
+        background: #e0fbe4 !important;
+        color: #064e3b !important;
+    }
+    .incorrect {
+        border-color: var(--bad) !important;
+        background: #fee2e2 !important;
+        color: #7f1d1d !important;
+    }
+
+    /* --------- Flip --------- */
+    .flip { position: relative; height: 360px; perspective: 1000px; }
+    .inner {
+        position: absolute; inset: 0;
+        transition: transform .6s;
+        transform-style: preserve-3d;
+    }
+    .card.flipped .inner { transform: rotateY(180deg); }
+    .face {
+        position: absolute; inset: 0; backface-visibility: hidden;
+        overflow: auto; padding: 1rem; border: 1px solid #eee; background: #fff;
+    }
+    .back { transform: rotateY(180deg); }
+
+    /* Headings inside faces */
+    .face h3 { margin: 0 0 .6rem; color: #0f172a; }
+    .face p { line-height: 1.6; margin: .5rem 0; }
+</style>
+</head>
+<body>
+
+<h1>Tannen — Oppositions Checking</h1>
+<p>Use ← → to navigate cards. Drag labels into the slots. Flip to switch between <strong>Gapfill</strong> and <strong>Situation</strong>.</p>
+
+<div class="controls">
+    <button class="btn btn-check"  onclick="checkAll()">Check answers</button>
+    <button class="btn btn-reveal" onclick="revealAll(true)">Reveal answers</button>
+    <button class="btn btn-hide"   onclick="revealAll(false)">Hide answers</button>
+    <button class="btn btn-reset"  onclick="resetAll()">Reset</button>
+</div>
+
+<!-- Label Pool -->
+<div id="pool" class="pool"></div>
+
+<!-- Card Carousel -->
+<div id="cards" class="carousel" tabindex="0"></div>
+
+<script>
+/* =========================================================
+   DATA — Corrected order (Advice before Information)
+   ========================================================= */
+
+/* GAPFILL — split by sentences (each sentence => <p>) */
+const GAP = [
+/* 1. Status vs Support */
+[
+"Men grow up in a world in which conversation is competitive - they seek to achieve the upper hand or to prevent others from dominating them.",
+"For women, however, talking is often a way to gain confirmation and support for their ideas.",
+"Men see the world as a place where people try to gain status and keep it.",
+"Women see the world as ‘a network of connections seeking support and consensus’."
+],
+/* 2. Independence vs Intimacy */
+[
+"Women often think in terms of closeness and support, and struggle to preserve intimacy.",
+"Men, concerned with status, tend to focus more on independence.",
+"These traits can lead women and men to starkly different views of the same situation.",
+"Professor Tannen gives the example of a woman who would check with her husband before inviting a guest to stay - because she likes telling friends that she has to check with him.",
+"The man, meanwhile, invites a friend without asking his wife first, because to tell the friend he must check amounts to a loss of status.",
+"(Often, of course, the relationship is such that an annoyed wife will rebuke him later)."
+],
+/* 3. Advice vs Understanding  (moved up) */
+[
+"Deborah Tannen claims that, to many men, a complaint is a challenge to find a solution:",
+"‘When my mother tells my father she doesn't feel well, he invariably offers to take her to the doctor.’",
+"‘Invariably, she is disappointed with his reaction.’",
+"Like many men, he is focused on what he can do, whereas she wants sympathy."
+],
+/* 4. Information vs Feelings (moved down) */
+[
+"A young man makes a brief phone call.",
+"His mother overhears it as a series of grunts.",
+"Later she asks him about it - it emerges that he has arranged to go to a specific place, where he will play football with various people and he has to take the ball.",
+"A young woman makes a phone call - it lasts half an hour or more.",
+"The mother asks about it - it emerges that she has been talking “you know” “about stuff”.",
+"The conversation has been mostly grooming-talk and comment on feelings.",
+"Historically, men's concerns were seen as more important than those of women.",
+"Today this situation may be reversed so that the giving of information and brevity of speech are considered of less value than sharing of emotions and elaboration.",
+"From the viewpoint of the language student neither is better (or worse) in any absolute sense."
+],
+/* 5. Orders vs Proposals */
+[
+"Women often suggest that people do things in indirect ways - “let's”, “why don't we?” or “wouldn't it be good, if we...?”",
+"Men may use, and prefer to hear, a direct imperative."
+],
+/* 6. Conflict vs Compromise */
+[
+"‘In trying to prevent fights,’ writes Professor Tannen, ‘some women refuse to oppose the will of others openly.’",
+"But sometimes it's far more effective for a woman to assert herself, even at the risk of conflict.",
+"This situation is easily observed in work-situations where a management decision seems unattractive - men will often resist it vocally, while women may appear to accede, but complain subsequently.",
+"Of course, this is a broad generalization - and for every one of Deborah Tannen's oppositions, we will know of men and women who are exceptions to the norm."
+]
+];
+
+/* SITUATIONS — full paragraphs, headings removed, order aligned with GAP */
+const SITU = [
+/* 1. Status vs Support */
+[
+"I saw this when my husband and I had jobs in different cities. People frequently made comments like, 'That must be rough,' and 'How do you stand it?' I accepted their sympathy and sometimes even reinforced it, saying, 'The worst part is having to pack and unpack all the time.'",
+"But my husband often reacted with irritation. Our situation had advantages, he would explain. As academics, we had four-day weekends together, as well as long vacations throughout the year and four months in the summer.",
+"Everything he said was true, but I didn't understand why he chose to say it. He told me that some of the comments implied: 'Yours is not a real marriage. I am superior to you because my wife and I have avoided your misfortune.' Until then it had not occurred to me there might be an element of one-upmanship."
+],
+/* 2. Independence vs Intimacy */
+[
+"When Josh's old high-school friend called him at work to say he'd be in town, Josh invited him to stay for the weekend. That evening he told Linda they were having a house guest.",
+"Linda was upset. How could Josh make these plans without discussing them with her beforehand? She would never do that to him. 'Why don't you tell your friend you have to check with your wife?' she asked.",
+"Josh replied, 'I can't tell my friend, \"I have to ask my wife for permission\"!'",
+"To Josh, checking with his wife would mean he was not free to act on his own. It would make him feel like a child or an underling. But Linda actually enjoys telling someone, 'I have to check with Josh.' It makes her feel good to show that her life is intertwined with her husband's."
+],
+/* 3. Advice vs Understanding  (moved up) */
+[
+"Eve had a benign lump removed from her breast. When she confided to her husband, Mark, that she was distressed because the stitches changed the contour of her breast, he answered, 'You can always have plastic surgery.'",
+"This comment bothered her. 'I'm sorry you don't like the way it looks,' she protested. 'But I'm not having any more surgery!'",
+"Mark was hurt and puzzled. 'I don't care about a scar,' he replied. 'It doesn't bother me at all.'",
+"'Then why are you telling me to have plastic surgery?' she asked.",
+"'Because you were upset about the way it looks.'",
+"Eve felt like a heel. Mark had been wonderfully supportive throughout her surgery. How could she snap at him now? Like many men, he is focused on what he can do, whereas she wants sympathy."
+],
+/* 4. Information vs Feelings (moved down) */
+[
+"A cartoon shows a husband opening a newspaper and asking his wife, 'Is there anything you'd like to say to me before I start reading the paper?' We know there isn't - but that as soon as the man begins reading, his wife will think of something.",
+"Rebecca, who is happily married, told me this is a source of dissatisfaction with her husband, Stuart. When she tells him what she is thinking, he listens silently. When she asks him what is on his mind, he says, 'Nothing.'",
+"All Rebecca's life she has had practice in verbalizing her emotions with friends and relatives. But Stuart has had practice in keeping his innermost thoughts to himself. To him, like most men, talk is transactional. He doesn't feel that talk is required at home."
+],
+/* 5. Orders vs Proposals */
+[
+"A married couple was in a car when the wife turned to her husband and asked, 'Would you like to stop for a coffee?'",
+"'No, thanks,' he answered truthfully. So they didn't stop.",
+"The result? The wife, who had indeed wanted to stop, became annoyed because she felt her preference had not been considered. The husband, seeing his wife was angry, became frustrated. Why didn't she just say what she wanted?",
+"Diana often begins statements with 'Let's.' She might say 'Let's park over there' or 'Let's clean up now, before lunch.'",
+"This makes Nathan angry. He has deciphered Diana's 'Let's' as a command. Like most men, he resists being told what to do. But to Diana, she is making suggestions, not demands. Her style of talking is a way of getting others to do what she wants - but by winning agreement first."
+],
+/* 6. Conflict vs Compromise */
+[
+"Dora was frustrated by a series of used cars she drove. It was she who commuted to work, but her husband, Hank, who chose the cars. Hank always went for cars that were 'interesting' but in continual need of repair.",
+"After Dora was nearly killed when her brakes failed, they were in the market for yet another used car. Dora wanted to buy a late-model sedan from a friend. Hank fixed his sights on a 15-year-old sports car. She tried to persuade Hank that it made more sense to buy the boring but dependable car, but he would not be swayed.",
+"Previously she would have acceded to his wishes. This time Dora bought the boring but dependable car and steeled herself for Hanks' anger. To her amazement, he spoke not a word of remonstrance. When she later told him what she had expected, he scoffed at her fears and said she should have done what she wanted from the start if she felt that strongly about it."
+]
+];
+
+/* Label targets (same order as above) */
+const TARGETS = [
+    ["Status","Support"],
+    ["Independence","Intimacy"],
+    ["Advice","Understanding"],      // swapped up
+    ["Information","Feelings"],      // swapped down
+    ["Orders","Proposals"],
+    ["Conflict","Compromise"]
+];
+const LABELS = TARGETS.flat();
+
+/* =========================================================
+   LABEL POOL
+   ========================================================= */
+let dragged = null;
+const pool = document.getElementById("pool");
+
+function makeTile(label){
+    const d=document.createElement("div");
+    d.className="tile";
+    d.textContent=label;
+    d.draggable=true;
+    d.addEventListener("dragstart",()=>dragged=d);
+    return d;
+}
+LABELS.forEach(l=>pool.appendChild(makeTile(l)));
+
+pool.addEventListener("dragover",e=>e.preventDefault());
+pool.addEventListener("drop",e=>{
+    e.preventDefault();
+    if(dragged) pool.appendChild(dragged);
+});
+
+/* =========================================================
+   RENDER CARDS
+   ========================================================= */
+const cards = document.getElementById("cards");
+
+for(let i=0;i<6;i++){
+    const card=document.createElement("div");
+    card.className="card";
+    card.id="card-"+i;
+
+    // slots
+    const slots=document.createElement("div");
+    slots.className="slots";
+    slots.innerHTML =
+        `<div class='droppable' id='slot-${i}-L'>drop</div>
+         <span>vs</span>
+         <div class='droppable' id='slot-${i}-R'>drop</div>`;
+    card.appendChild(slots);
+
+    // slot handlers
+    slots.querySelectorAll(".droppable").forEach(s=>{
+        s.addEventListener("dragover",e=>e.preventDefault());
+        s.addEventListener("drop",e=>{
+            e.preventDefault();
+            if(!dragged) return;
+            const old=s.querySelector(".tile");
+            if(old) pool.appendChild(old);
+            s.innerHTML=""; s.appendChild(dragged);
+        });
+    });
+
+    // flip box
+    const flip=document.createElement("div");
+    flip.className="flip";
+    const inner=document.createElement("div");
+    inner.className="inner";
+
+    // front (Gapfill)
+    const front=document.createElement("div");
+    front.className="face";
+    front.innerHTML="<h3>Gapfill</h3>" + GAP[i].map(p=>`<p>${p}</p>`).join("");
+
+    // back (Situation) — with header
+    const back=document.createElement("div");
+    back.className="face back";
+    back.innerHTML="<h3>Situation</h3>" + SITU[i].map(p=>`<p>${p}</p>`).join("");
+
+    inner.appendChild(front);
+    inner.appendChild(back);
+    flip.appendChild(inner);
+    card.appendChild(flip);
+
+    // flip button (styled)
+    const flipBtn=document.createElement("button");
+    flipBtn.className="btn btn-hide";
+    flipBtn.textContent="Flip";
+    flipBtn.onclick=()=>card.classList.toggle("flipped");
+    card.appendChild(flipBtn);
+
+    // answer line
+    const ans=document.createElement("p");
+    ans.id=`ans-${i}`;
+    ans.style.display="none";
+    ans.textContent = `Answer: ${TARGETS[i][0]} vs ${TARGETS[i][1]}`;
+    card.appendChild(ans);
+
+    cards.appendChild(card);
+}
+
+/* =========================================================
+   KEYBOARD NAVIGATION
+   ========================================================= */
+cards.addEventListener("keydown",e=>{
+    if(e.key==="ArrowRight") cards.scrollBy({left:500,behavior:"smooth"});
+    if(e.key==="ArrowLeft")  cards.scrollBy({left:-500,behavior:"smooth"});
+});
+
+/* =========================================================
+   CHECK / REVEAL / RESET
+   ========================================================= */
+function checkAll(){
+    TARGETS.forEach((pair,i)=>{
+        const L=document.getElementById(`slot-${i}-L`).innerText.trim();
+        const R=document.getElementById(`slot-${i}-R`).innerText.trim();
+        const ok=(L===pair[0]&&R===pair[1])||(L===pair[1]&&R===pair[0]);
+        const SL=document.getElementById(`slot-${i}-L`);
+        const SR=document.getElementById(`slot-${i}-R`);
+        SL.classList.remove("correct","incorrect");
+        SR.classList.remove("correct","incorrect");
+        if(L||R){
+            SL.classList.add(ok?"correct":"incorrect");
+            SR.classList.add(ok?"correct":"incorrect");
+        }
+    });
+}
+function revealAll(on){
+    for(let i=0;i<6;i++){
+        document.getElementById(`ans-${i}`).style.display = on ? "block" : "none";
+    }
+}
+function resetAll(){
+    // move tiles back to pool
+    document.querySelectorAll(".droppable .tile").forEach(t=>pool.appendChild(t));
+    // clear slots
+    document.querySelectorAll(".droppable").forEach(d=>{
+        d.textContent="drop";
+        d.classList.remove("correct","incorrect");
+    });
+    // hide answers & unflip
+    revealAll(false);
+    document.querySelectorAll(".card").forEach(c=>c.classList.remove("flipped"));
+}
+</script>
+
+</body>
+</html>
+``

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Cohesion Analysis: Classroom Edition</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: #ffffff;
+            color: #24292e;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 30px;
+            margin: 0;
+        }
+        h1 { font-size: 3rem; color: #0366d6; margin-bottom: 5px; }
+        .subtitle { font-size: 1.5rem; color: #586069; margin-bottom: 30px; }
+        
+        .main-container { display: flex; gap: 30px; width: 95%; max-width: 1400px; align-items: flex-start; }
+        
+        #sortable-list { list-style: none; padding: 0; flex: 2; }
+        
+        .sentence-card {
+            background-color: #f6f8fa;
+            border: 3px solid #e1e4e8;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            padding: 20px;
+            font-size: 2rem; 
+            font-weight: 600;
+            cursor: grab;
+            transition: all 0.2s ease;
+            text-align: left;
+        }
+
+        .dragging { opacity: 0.4; background-color: #dbedff; }
+        
+        /* Analysis Styling */
+        .analysis-panel {
+            flex: 1;
+            background: #fff9e6;
+            border: 3px solid #f1e05a;
+            border-radius: 12px;
+            padding: 20px;
+            display: none; /* Hidden until solved */
+            font-size: 1.3rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .analysis-panel h2 { color: #85702a; margin-top: 0; }
+        .highlight { padding: 0 5px; border-radius: 4px; color: white; }
+        .hl-blue { background-color: #0366d6; }
+        .hl-green { background-color: #2ea44f; }
+        .hl-red { background-color: #d73a49; }
+        .hl-purple { background-color: #8250df; }
+
+        .btn-container { margin-top: 30px; display: flex; gap: 20px; }
+        button {
+            padding: 20px 40px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            border-radius: 10px;
+            cursor: pointer;
+            border: none;
+        }
+        #check-btn { background-color: #2ea44f; color: white; }
+        #reveal-btn { background-color: #0366d6; color: white; display: none; }
+        #reset-btn { background-color: #d73a49; color: white; }
+        
+        #feedback { margin-top: 20px; font-size: 2rem; font-weight: bold; }
+        .correct-state { border-color: #2ea44f !important; background-color: #dcffe4 !important; }
+    </style>
+</head>
+<body>
+
+    <h1>Cohesion Challenge</h1>
+    <p class="subtitle">Order the story, then reveal the linguistic "glue" holding it together.</p>
+
+    <div class="main-container">
+        <ul id="sortable-list"></ul>
+        
+        <div id="analysis" class="analysis-panel">
+            <h2>Linguistic Analysis</h2>
+            <div id="analysis-content"></div>
+        </div>
+    </div>
+
+    <div class="btn-container">
+        <button id="check-btn">Check Order</button>
+        <button id="reveal-btn">Reveal Analysis</button>
+        <button id="reset-btn" onclick="location.reload()">Reset</button>
+    </div>
+
+    <div id="feedback"></div>
+
+<script>
+    const data = [
+        { text: "John looked out of the window.", note: "Introduces the subject (John) and setting." },
+        { text: "He thought he saw a shape in the bushes.", note: "<b class='hl-blue'>He</b> is an <b>Anaphoric Reference</b> to John." },
+        { text: "Dark, strange and furtive.", note: "Uses <b>Ellipsis</b>; the words 'The shape was' are omitted but understood." },
+        { text: "Could it be a fox?", note: "<b class='hl-green'>It</b> is a <b>Co-reference</b> to the 'shape' in the previous sentence." },
+        { text: "Mary had told him about the foxes.", note: "Uses <b>Repetition</b> (fox/foxes) to link the thought to Mary's warning." },
+        { text: "However, nobody had seen one for months.", note: "<b class='hl-red'>However</b> is a <b>Connective</b>. <b class='hl-purple'>One</b> is a <b>Substitution</b> for 'fox'." }
+    ];
+
+    const list = document.getElementById('sortable-list');
+    const analysisPanel = document.getElementById('analysis');
+    const analysisContent = document.getElementById('analysis-content');
+    const revealBtn = document.getElementById('reveal-btn');
+    const feedback = document.getElementById('feedback');
+
+    function init() {
+        let shuffled = [...data].sort(() => Math.random() - 0.5);
+        shuffled.forEach(item => {
+            const li = document.createElement('li');
+            li.className = 'sentence-card';
+            li.draggable = true;
+            li.textContent = item.text;
+            list.appendChild(li);
+        });
+    }
+
+    // Drag and Drop Logic
+    list.addEventListener('dragstart', (e) => e.target.classList.add('dragging'));
+    list.addEventListener('dragend', (e) => e.target.classList.remove('dragging'));
+    list.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const dragging = document.querySelector('.dragging');
+        const afterElement = [...list.querySelectorAll('.sentence-card:not(.dragging)')].reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = e.clientY - box.top - box.height / 2;
+            return (offset < 0 && offset > closest.offset) ? { offset, element: child } : closest;
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+        if (afterElement == null) list.appendChild(dragging);
+        else list.insertBefore(dragging, afterElement);
+    });
+
+    document.getElementById('check-btn').addEventListener('click', () => {
+        const current = [...document.querySelectorAll('.sentence-card')];
+        let correct = current.every((el, i) => el.textContent === data[i].text);
+        
+        if (correct) {
+            current.forEach(el => el.classList.add('correct-state'));
+            feedback.textContent = "✔ Correct! Ready for analysis?";
+            feedback.style.color = "#2ea44f";
+            revealBtn.style.display = "block";
+        } else {
+            feedback.textContent = "Not quite. Look for pronouns and connections!";
+            feedback.style.color = "#d73a49";
+        }
+    });
+
+    revealBtn.addEventListener('click', () => {
+        analysisPanel.style.display = "block";
+        analysisContent.innerHTML = data.map((item, i) => `
+            <p><strong>Step ${i+1}:</strong> ${item.note}</p>
+        `).join('');
+        
+        // Highlight logic in cards
+        const cards = document.querySelectorAll('.sentence-card');
+        cards[1].innerHTML = '<span class="hl-blue">He</span> thought he saw a shape in the bushes.';
+        cards[3].innerHTML = 'Could <span class="hl-green">it</span> be a fox?';
+        cards[5].innerHTML = '<span class="hl-red">However</span>, nobody had seen <span class="hl-purple">one</span> for months.';
+    });
+
+    init();
+</script>
+</body>
+</html>

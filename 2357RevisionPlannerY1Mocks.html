@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mock Exam Revision Planner</title>
+    <style>
+        :root {
+            --primary: #3498db;
+            --secondary: #2c3e50;
+            --success: #27ae60;
+            --bg: #f4f7f6;
+        }
+
+        body { 
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
+            background-color: var(--bg); 
+            margin: 0; 
+            padding: 10px; 
+            color: #333; 
+            display: flex; 
+            flex-direction: column; 
+            height: 100vh; 
+            box-sizing: border-box; 
+        }
+
+        h1 { text-align: center; color: var(--secondary); margin: 10px 0; font-size: 1.5rem; }
+
+        .container { display: flex; gap: 20px; flex: 1; overflow: hidden; }
+
+        /* Sidebar Styles */
+        .sidebar { 
+            width: 280px; 
+            background: #fff; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
+            display: flex; 
+            flex-direction: column; 
+            transition: all 0.3s ease;
+        }
+        
+        .subject-list-container { flex: 1; overflow-y: auto; margin-bottom: 10px; border: 1px solid #eee; padding: 10px; border-radius: 4px; }
+        
+        .subject-row { display: flex; align-items: center; margin-bottom: 8px; font-size: 0.9em; }
+        .subject-row:hover { background: #f9f9f9; border-radius: 4px; }
+        
+        .color-lozenge {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            margin: 0 8px;
+            cursor: pointer;
+            flex-shrink: 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            transition: transform 0.1s;
+        }
+        .color-lozenge:active { transform: scale(0.9); }
+        .subject-label { cursor: pointer; flex: 1; margin: 0; padding: 4px 0; }
+
+        /* Buttons */
+        button { color: #fff; border: none; padding: 12px; width: 100%; border-radius: 4px; cursor: pointer; font-size: 1rem; margin-top: 8px; font-weight: bold; }
+        .btn-generate { background: var(--primary); }
+        .btn-print { background: var(--success); }
+
+        /* Calendar Styles */
+        .calendar-container { flex: 1; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; padding-right: 5px; }
+        .week-grid { display: grid; gap: 8px; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .week-title { grid-column: 1 / -1; font-weight: bold; text-align: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 2px solid #eee; color: var(--secondary); }
+        
+        .header-cell { font-weight: bold; text-align: center; padding: 8px; background: #ecf0f1; border-radius: 4px; font-size: 0.85rem; }
+        .time-label { display: flex; align-items: center; justify-content: center; font-weight: bold; background: #ecf0f1; border-radius: 4px; font-size: 0.8rem; }
+        
+        .slot { background: #fafafa; border: 2px dashed #ccc; border-radius: 4px; min-height: 70px; padding: 5px; display: flex; flex-direction: column; gap: 5px; }
+        .slot.exam-slot { border-style: solid; border-color: #e74c3c; background: #fff5f4; }
+        .slot.weekend-slot { background: #f1f1f1; }
+        .slot.drag-over { background: #e0f7fa; border-color: var(--primary); }
+
+        /* Draggable/Tappable Items */
+        .item { 
+            padding: 8px; 
+            border-radius: 4px; 
+            color: #fff; 
+            font-size: 0.75rem; 
+            text-align: center; 
+            cursor: grab; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            user-select: none;
+            touch-action: manipulation;
+        }
+        .item.selected { outline: 3px solid #2ecc71; transform: scale(1.05); box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .item.exam { cursor: default; font-weight: bold; border: 2px solid rgba(0,0,0,0.1); }
+
+        /* RESPONSIVE LOGIC */
+        @media (max-width: 1024px) {
+            .container { flex-direction: column; overflow: visible; }
+            .sidebar { width: 100%; height: auto; margin-bottom: 20px; }
+            .subject-list-container { max-height: 200px; }
+            body { height: auto; }
+        }
+
+        @media (max-width: 600px) {
+            .week-grid { grid-template-columns: 1fr !important; }
+            .header-cell { display: none; }
+            .time-label { background: var(--secondary); color: white; margin-top: 10px; }
+            .slot::before { content: attr(data-day); font-size: 0.7rem; color: #888; display: block; margin-bottom: 4px; font-weight: bold; }
+        }
+
+        /* Print Style Fixes */
+        @media print {
+            @page { margin: 1cm; }
+            body, html { 
+                height: auto !important; 
+                margin: 0 !important; 
+                padding: 0 !important; 
+                overflow: visible !important; 
+                background-color: #fff !important;
+            }
+            .sidebar, .btn-print, h1 { display: none !important; }
+            .container, .calendar-container { 
+                display: block !important; 
+                height: auto !important; 
+                overflow: visible !important; 
+                padding: 0 !important; 
+                margin: 0 !important; 
+            }
+            .calendar-container > p { display: none !important; } /* Hide helper text */
+            .week-grid { 
+                box-shadow: none; 
+                border: 1px solid #000; 
+                page-break-inside: avoid; 
+                break-inside: avoid;
+                margin-bottom: 20px; 
+            }
+            .week-grid:last-child { 
+                margin-bottom: 0; /* Prevents an empty page at the end */
+            }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Revision Planner</h1>
+    
+    <div class="container">
+        <div class="sidebar">
+            <h3 style="margin:0 0 10px 0;">1. Choose Subjects</h3>
+            <div class="subject-list-container" id="subject-list"></div>
+            <button class="btn-generate" onclick="generatePlan()">2. Create Plan</button>
+            <button class="btn-print" onclick="window.print()">Print to PDF</button>
+        </div>
+        
+        <div class="calendar-container" id="calendar">
+            <p style="text-align: center; color: #888; margin-top: 50px;">Select your subjects and click "Create Plan" to begin.</p>
+        </div>
+    </div>
+
+    <script>
+        const exams = [
+            { subject: "Sociology", date: "2026-04-27", time: "AM" },
+            { subject: "Physics", date: "2026-04-27", time: "AM" },
+            { subject: "Psychology", date: "2026-04-27", time: "PM" },
+            { subject: "Further Maths", date: "2026-04-27", time: "PM" },
+            { subject: "Marine Science", date: "2026-04-27", time: "PM" },
+            { subject: "Biology", date: "2026-04-28", time: "AM" },
+            { subject: "Media Studies", date: "2026-04-28", time: "AM" },
+            { subject: "Business Studies", date: "2026-04-28", time: "PM" },
+            { subject: "English Language", date: "2026-04-28", time: "PM" },
+            { subject: "Environmental Science", date: "2026-04-28", time: "PM" },
+            { subject: "English Literature", date: "2026-04-29", time: "AM" },
+            { subject: "English Lang & Lit", date: "2026-04-29", time: "AM" },
+            { subject: "Maths 1", date: "2026-04-29", time: "AM" },
+            { subject: "History", date: "2026-04-29", time: "PM" },
+            { subject: "Geography", date: "2026-04-29", time: "PM" },
+            { subject: "Medical Science", date: "2026-04-29", time: "PM" },
+            { subject: "Law", date: "2026-04-30", time: "AM" },
+            { subject: "Music Level 3 Dip Single", date: "2026-04-30", time: "AM" },
+            { subject: "Philosophy", date: "2026-04-30", time: "PM" },
+            { subject: "Spanish", date: "2026-04-30", time: "PM" },
+            { subject: "Music", date: "2026-04-30", time: "PM" },
+            { subject: "Economics", date: "2026-04-30", time: "PM" },
+            { subject: "Computer Science", date: "2026-04-30", time: "PM" },
+            { subject: "Chemistry", date: "2026-05-01", time: "AM" },
+            { subject: "Classical Civilisation", date: "2026-05-01", time: "AM" },
+            { subject: "Politics", date: "2026-05-01", time: "PM" },
+            { subject: "Film Studies", date: "2026-05-01", time: "PM" },
+            { subject: "Maths 2", date: "2026-05-01", time: "PM" }
+        ];
+
+        const colors = [
+            '#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4', '#42d4f4', '#f032e6', '#bfef45', 
+            '#fabed4', '#469990', '#dcbeff', '#9a6324', '#800000', '#aaffc3', '#808000', '#ffd8b1', 
+            '#000075', '#a9a9a9', '#f06292', '#827717', '#1a237e', '#004d40', '#311b92', '#b71c1c', 
+            '#0d47a1', '#e65100', '#1b5e20', '#4e342e', '#212121', '#ff1493'
+        ];
+
+        const subjectColors = {};
+        const allSubjects = [...new Set(exams.map(e => e.subject))].sort();
+        allSubjects.forEach((sub, i) => subjectColors[sub] = colors[i % colors.length]);
+
+        const weeks = [
+            { id: 'w1', title: 'Prep Week (Apr 20 - 26)', days: ['2026-04-20','2026-04-21','2026-04-22','2026-04-23','2026-04-24','2026-04-25','2026-04-26'] },
+            { id: 'w2', title: 'Exam Week (Apr 27 - May 1)', days: ['2026-04-27','2026-04-28','2026-04-29','2026-04-30','2026-05-01'] }
+        ];
+
+        const listDiv = document.getElementById('subject-list');
+        allSubjects.forEach(sub => {
+            const safeId = sub.replace(/\s+/g, '-');
+            listDiv.innerHTML += `
+                <div class="subject-row">
+                    <input type="checkbox" value="${sub}" class="sub-checkbox" id="chk-${safeId}"> 
+                    <span class="color-lozenge" style="background-color: ${subjectColors[sub]};" 
+                          onclick="swapColor('${sub}', this)" title="Tap to swap color with an unselected subject"></span>
+                    <label class="subject-label" for="chk-${safeId}">${sub}</label>
+                </div>
+            `;
+        });
+
+        function swapColor(subject, lozengeElement) {
+            const unselectedCheckboxes = Array.from(document.querySelectorAll('.sub-checkbox:not(:checked)'));
+            const validSwapTargets = unselectedCheckboxes.filter(cb => cb.value !== subject);
+
+            if (validSwapTargets.length > 0) {
+                const randomCb = validSwapTargets[Math.floor(Math.random() * validSwapTargets.length)];
+                const swapSubject = randomCb.value;
+                
+                const tempColor = subjectColors[subject];
+                subjectColors[subject] = subjectColors[swapSubject];
+                subjectColors[swapSubject] = tempColor;
+                
+                lozengeElement.style.backgroundColor = subjectColors[subject];
+                
+                const swapLozenge = randomCb.parentElement.querySelector('.color-lozenge');
+                if (swapLozenge) {
+                    swapLozenge.style.backgroundColor = subjectColors[swapSubject];
+                }
+                
+                const blocks = document.querySelectorAll(`.item[data-subject="${subject}"]`);
+                blocks.forEach(block => {
+                    block.style.backgroundColor = subjectColors[subject];
+                });
+            } else {
+                alert("Please leave at least one subject unchecked to swap colors!");
+            }
+        }
+
+        function buildCalendar() {
+            const cal = document.getElementById('calendar');
+            cal.innerHTML = '';
+            weeks.forEach(week => {
+                let html = `<div class="week-grid" style="grid-template-columns: 80px repeat(${week.days.length}, 1fr);">
+                    <div class="week-title">${week.title}</div>
+                    <div class="header-cell">Time</div>`;
+                week.days.forEach(day => {
+                    const d = new Date(day);
+                    html += `<div class="header-cell">${d.toLocaleDateString('en-GB',{weekday:'short'})} ${d.getDate()}</div>`;
+                });
+                ['AM', 'PM', 'Evening'].forEach(time => {
+                    html += `<div class="time-label">${time}</div>`;
+                    week.days.forEach(day => {
+                        const d = new Date(day);
+                        const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                        const isExam = week.id === 'w2' && !isWeekend;
+                        const slotDayName = d.toLocaleDateString('en-GB',{weekday:'long'});
+                        html += `<div class="slot ${isExam?'exam-slot':''} ${isWeekend?'weekend-slot':''}" 
+                                      id="slot-${day}-${time}" data-day="${slotDayName} (${time})"
+                                      onclick="handleSlotClick(this)" ondrop="drop(event)" ondragover="allowDrop(event)"></div>`;
+                    });
+                });
+                cal.innerHTML += html + `</div>`;
+            });
+        }
+
+        let selectedItem = null;
+
+        function handleSlotClick(slot) {
+            if (selectedItem) {
+                slot.appendChild(selectedItem);
+                selectedItem.classList.remove('selected');
+                selectedItem = null;
+                return;
+            }
+            const item = event.target.closest('.item');
+            if (item && !item.classList.contains('exam')) {
+                if (selectedItem) selectedItem.classList.remove('selected');
+                selectedItem = item;
+                item.classList.add('selected');
+                event.stopPropagation();
+            }
+        }
+
+        function generatePlan() {
+            buildCalendar();
+            const selected = Array.from(document.querySelectorAll('.sub-checkbox:checked')).map(cb => cb.value);
+            let idCounter = 0;
+
+            selected.forEach(sub => {
+                const exam = exams.find(e => e.subject === sub);
+                const color = subjectColors[sub];
+                const examSlot = document.getElementById(`slot-${exam.date}-${exam.time}`);
+                
+                if (examSlot) examSlot.innerHTML += `<div class="item exam" data-subject="${sub}" style="background:${color}">⭐ ${sub} EXAM</div>`;
+
+                [2, 3, 5, 7].forEach(daysBack => {
+                    const d = new Date(exam.date);
+                    d.setDate(d.getDate() - daysBack);
+                    const dateStr = d.toISOString().split('T')[0];
+                    const times = ['AM', 'PM', 'Evening'];
+                    const time = times[Math.floor(Math.random()*3)];
+                    const slot = document.getElementById(`slot-${dateStr}-${time}`);
+                    if (slot) {
+                        idCounter++;
+                        slot.innerHTML += `<div class="item" draggable="true" ondragstart="drag(event)" id="item-${idCounter}" data-subject="${sub}" style="background:${color}" onclick="handleSlotClick(this)">${sub} (${daysBack}d)</div>`;
+                    }
+                });
+            });
+        }
+
+        function allowDrop(ev) { ev.preventDefault(); }
+        function drag(ev) { ev.dataTransfer.setData("text", ev.target.id); }
+        function drop(ev) {
+            ev.preventDefault();
+            const data = ev.dataTransfer.getData("text");
+            const el = document.getElementById(data);
+            if (ev.currentTarget.classList.contains('slot')) ev.currentTarget.appendChild(el);
+        }
+    </script>
+</body>
+</html>

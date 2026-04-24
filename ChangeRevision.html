@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Language Change Card Randomiser</title>
+
+<style>
+:root {
+  --bg-color: #f8f9fa;
+  --card-bg: #ffffff;
+  --primary-blue: #2563eb;
+  --accent-orange: #f59e0b;
+  --text-main: #1e293b;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  margin: 0;
+  color: var(--text-main);
+}
+
+.container {
+  text-align: center;
+  width: 95%;
+  max-width: 1200px;
+}
+
+h1 {
+  font-size: 2.5rem;
+  margin-bottom: 0.75rem;
+}
+
+p.instr {
+  margin-bottom: 2rem;
+  color: #64748b;
+  font-size: 1.1rem;
+}
+
+.card-display {
+  display: flex;
+  justify-content: center;
+  gap: 25px;
+  margin-bottom: 2.5rem;
+  min-height: 300px;
+  flex-wrap: wrap;
+}
+
+.card {
+  background: var(--card-bg);
+  border-radius: 24px;
+  box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+  width: 100%;
+  max-width: 450px;
+  min-width: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  font-size: 2.6rem;
+  font-weight: 800;
+  text-align: center;
+  border: 6px solid var(--primary-blue);
+  cursor: pointer;
+  animation: slideUp 0.4s cubic-bezier(0.175,0.885,0.32,1.275);
+  user-select: none;
+}
+
+.card:hover {
+  transform: translateY(-8px);
+  background-color: #f0f7ff;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(30px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+.controls {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+button {
+  padding: 16px 30px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  border-radius: 12px;
+  background-color: var(--primary-blue);
+  color: white;
+}
+
+button.secondary {
+  background-color: #64748b;
+}
+
+button:hover {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+}
+
+.options {
+  margin-bottom: 20px;
+  font-size: 1rem;
+  color: #475569;
+}
+
+.options label {
+  margin: 0 12px;
+  cursor: pointer;
+}
+
+.status-area {
+  margin-top: 15px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<h1>Language Change Revision Cards</h1>
+<p class="instr">Click a card to replace it with another according to the current rules.</p>
+
+<div id="cardContainer" class="card-display">
+  <div class="card" style="font-size:1.8rem">
+    Choose an option below to begin
+  </div>
+</div>
+
+<div class="controls">
+  <button onclick="drawSingle('terms')">Pull Term</button>
+  <button onclick="drawSingle('names')">Pull Name</button>
+  <button onclick="drawPair()">Pull Pair</button>
+  <button class="secondary" onclick="resetDecks()">Reset</button>
+</div>
+
+<div class="options">
+  <strong>Pair options:</strong>
+  <label>
+    <input type="checkbox" id="useTerms" checked> Terms
+  </label>
+  <label>
+    <input type="checkbox" id="useNames" checked> Names
+  </label>
+</div>
+
+<div class="status-area" id="status"></div>
+
+</div>
+
+<script>
+const TERMS = [
+  "Accommodation",
+  "Borrowing",
+  "Divergence / Convergence",
+  "Grammaticalisation",
+  "Prescriptivism / Descriptivism",
+  "Push / Drag Chains",
+  "Regularisation",
+  "S-curves",
+  "Standardisation",
+  "Tadpoles / Cuckoos / Multiple Births",
+  "Variation"
+];
+
+const NAMES = [
+  "Cawdrey",
+  "Caxton",
+  "Chaucer",
+  "Johnson",
+  "King James",
+  "Labov",
+  "Rosewarne",
+  "Shakespeare",
+  "Swift",
+  "Webster"
+];
+
+let termDeck, nameDeck;
+
+function shuffle(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+}
+
+function resetDecks() {
+  termDeck = [...TERMS];
+  nameDeck = [...NAMES];
+  shuffle(termDeck);
+  shuffle(nameDeck);
+  updateStatus();
+}
+
+function drawCard(from) {
+  if (from === "terms") {
+    if (termDeck.length === 0) resetDecks();
+    return termDeck.pop();
+  } else {
+    if (nameDeck.length === 0) resetDecks();
+    return nameDeck.pop();
+  }
+}
+
+/* ✅ NEW: decide source at redraw-time based on checkboxes */
+function getPairSource() {
+  const sources = [];
+  if (document.getElementById("useTerms").checked) sources.push("terms");
+  if (document.getElementById("useNames").checked) sources.push("names");
+  if (sources.length === 0) return "terms";
+  return sources[Math.floor(Math.random() * sources.length)];
+}
+
+function drawSingle(type) {
+  const container = document.getElementById("cardContainer");
+  container.innerHTML = "";
+
+  const card = document.createElement("div");
+  card.className = "card";
+  card.innerText = drawCard(type);
+  card.onclick = () => card.innerText = drawCard(type);
+
+  container.appendChild(card);
+  updateStatus();
+}
+
+function drawPair() {
+  const container = document.getElementById("cardContainer");
+  container.innerHTML = "";
+
+  for (let i = 0; i < 2; i++) {
+    const source = getPairSource();
+
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerText = drawCard(source);
+
+    /* ✅ clicking now re-evaluates pair rules */
+    card.onclick = () => {
+      const newSource = getPairSource();
+      card.innerText = drawCard(newSource);
+    };
+
+    container.appendChild(card);
+  }
+
+  updateStatus();
+}
+
+function updateStatus() {
+  document.getElementById("status").innerText =
+    `Terms left: ${termDeck.length} | Names left: ${nameDeck.length}`;
+}
+
+resetDecks();
+</script>
+
+</body>
+</html>

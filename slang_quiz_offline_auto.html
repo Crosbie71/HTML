@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<meta name='viewport' content='width=device-width, initial-scale=1' />
+<title>Slinging Slang – Offline Auto‑Scoring Quiz (Inline + Final)</title>
+<style>
+  :root{--bg:#0b1020;--card:#121a38;--ink:#e8eaf1;--muted:#b8bee0;--accent:#3a58ff;}
+  html,body{margin:0;height:100%;}
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);}
+  header{padding:1.25rem 1rem;background:linear-gradient(135deg,#0b1020,#1b2b64);}
+  header h1{margin:.2rem 0;font-size:1.4rem}
+  header p{margin:0;color:var(--muted)}
+  main{max-width:980px;margin:0 auto;padding:1rem}
+  .summary{position:sticky;top:0;z-index:10;background:#0e1533;border:1px solid #2a3a78;border-radius:12px;margin:0 0 1rem;padding:0.75rem}
+  .summary-row{display:flex;flex-wrap:wrap;gap:.75rem;align-items:center}
+  .era-badge{display:inline-block;padding:.25rem .5rem;border-radius:999px;background:#3040a8;margin-right:.5rem}
+  .controls{margin-left:auto;display:flex;gap:.5rem}
+  button{background:var(--accent);color:white;border:0;border-radius:8px;padding:.5rem .75rem;font-weight:700;cursor:pointer}
+  .secondary{background:#203074}
+  .card{background:var(--card);border:1px solid #2a3a78;border-radius:12px;margin:1rem 0;padding:1rem}
+  .q{font-weight:700;margin-bottom:.5rem}
+  .opt{margin:.35rem 0;padding:.35rem .5rem;border-radius:8px;display:flex;gap:.5rem;align-items:flex-start}
+  .opt:hover{background:#17204a}
+  .inline-result{margin-top:.6rem;padding:.6rem;border-left:4px solid #3f4fb8;background:#0e1533;border-radius:6px}
+  .muted{color:var(--muted)}
+  .small{font-size:.9rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Slinging Slang – Offline Auto‑Scoring Quiz</h1>
+  <p class='small'>Per‑question feedback (year + comment) and a live overall result. No internet required.</p>
+</header>
+<main>
+  <div class='summary' id='summaryBox'>
+    <div class='summary-row'>
+      <div id='overallEra'><span class='era-badge'>—</span><strong>Overall era:</strong> <span id='overallEraText'>—</span></div>
+      <div><strong>Answered:</strong> <span id='answeredCount'>0</span>/<span id='totalCount'>0</span></div>
+      <div><strong>Average year:</strong> <span id='avgYear'>—</span></div>
+      <div class='small' id='quipBox'></div>
+      <div class='controls'>
+        <button type='button' id='resetBtn' class='secondary'>Clear all</button>
+      </div>
+    </div>
+  </div>
+  <form id='quiz'></form>
+  <div class='card small'>
+    <p><strong>Attribution</strong>: Questions, answers, years, and comments are taken exactly from your provided HTML copy of the alphaDictionary Slang Generation test. This file is rebuilt to function completely offline.</p>
+  </div>
+</main>
+<script>
+const questions = [{"q": "What did you and your special someone do when you were \n  alone in your HS-college days?", "opts": [{"text": "Make whoopee.", "year": 1925, "comment": "Went out in the 20s."}, {"text": "Cuddle \n    or spoon.", "year": 1935, "comment": "Also the 20s but carried over to the 30s."}, {"text": "Smooch or \n    pet.", "year": 1945, "comment": "Popular during World War II."}, {"text": "Neck or make \n    out.", "year": 1955, "comment": "The Elvis Era 1950s."}, {"text": "Hooch up or mug \n    down.", "year": 1995, "comment": "Started in the 90s"}, {"text": "Maul or \n    mash.", "year": 2005, "comment": "What they are doing now."}]}, {"q": "What was the euphemism tough guys used for \"kill\" in \n  your HS-college years?", "opts": [{"text": "To cool or smoke.", "year": 1925, "comment": "The language of Capone and Prohibition."}, {"text": "To \n    knock off, bump off, or rub out.", "year": 1945, "comment": "Bogie and George Raft did this in movies of the 40s."}, {"text": "To ice, snuff, or take \n    out.", "year": 1965, "comment": "60s terms that came back from Vietnam."}, {"text": "To hit, off, \n    pop.", "year": 1975, "comment": "From the late 60s to 80s."}, {"text": "To \n    whack.", "year": 1995, "comment": "This is what Tony Soprano does."}]}, {"q": "How did your HS-college generation say \"leave\" or \"get \n  out of here\"?", "opts": [{"text": "Beat \n    it.", "year": 1925, "comment": "Began in the 20s though carried over to the 40s."}, {"text": "Scram, beat \n    it, or fade.", "year": 1935, "comment": "Sam Spade talk of the 30s."}, {"text": "Take a powder, \n    beat it, scram.", "year": 1945, "comment": "World War II era 1940s."}, {"text": "Blow \n    or cut out.", "year": 1955, "comment": "Along with the fender skirts and curb feelers of the 50s."}, {"text": "Split or bug \n    out.", "year": 1965, "comment": "Hippy talk of the 60s."}, {"text": "Boogie or \n    bounce.", "year": 1985, "comment": "Disco talk of the 80s."}, {"text": "Ace, \n    bail, book, or jet.", "year": 1995, "comment": "Words from the Rapper era 90s."}, {"text": "Navigate, pearl, \n    tip.", "year": 2005, "comment": "What's going on now."}]}, {"q": "How did you and your friends say \"lose control\" or \"go \n  crazy\" in HS-college?", "opts": [{"text": "Off \n    the deep end.", "year": 1925, "comment": "1920s but is now a regular idiom."}, {"text": "Go bananas or off \n    the deep end.", "year": 1935, "comment": "Started in the 30s."}, {"text": "Flip your wig.", "year": 1945, "comment": "Popular in the Be-bop era of the 40s."}, {"text": "Go ape.", "year": 1955, "comment": "Came in with Rock and roll in the 50s."}, {"text": "Flip (out) \n    or freak out.", "year": 1965, "comment": "More hippy talk of the 60s."}, {"text": "Go \n    ballistic.", "year": 1975, "comment": "Began toward the end of the 60s."}, {"text": "Wig out or go \n    postal.", "year": 1985, "comment": "After the first mass murder over a job."}, {"text": "Lunch.", "year": 1995, "comment": "Very recent like the 90s."}, {"text": "Jump \n    the couch.", "year": 2005, "comment": "Tom Cruise's recent contribution."}]}, {"q": "What did you and your HS-college buddies do when you \n  relaxed and chatted?", "opts": [{"text": "Hang around \n    with, shoot the breeze.", "year": 1945, "comment": "What you did in the 40s."}, {"text": "Hang out or hang \nloose.", "year": 1965, "comment": "Hang loose started in the late 50s."}, {"text": "Chill \n    out or hang out.", "year": 1975, "comment": "Chilling is still around too since the 70s."}, {"text": "Chill \n    or hang.", "year": 1985, "comment": "The phrase--chill out--shortened in the 80s."}, {"text": "Chizzil or \n    marinate.", "year": 1995, "comment": "Current variations of Chill."}]}, {"q": "What did your HS-college generation's call \n  stealing?", "opts": [{"text": "Nab, nick, or filch.", "year": 1925, "comment": "Do you still wear spats from the 20s?"}, {"text": "Cop or clip.", "year": 1935, "comment": "1930s mostly."}, {"text": "Clip \n    or lift.", "year": 1945, "comment": "Lift was just beginning to appear in the 40s."}, {"text": "Lift.", "year": 1955, "comment": "Standard for the 50s."}, {"text": "Rip \n    off.", "year": 1965, "comment": "The love children of the 60s."}, {"text": "Gank or hook.", "year": 1980, "comment": "1970s and 80s."}, {"text": "Jack or \n    punk.", "year": 1995, "comment": "From the car-jacking era--1990s"}, {"text": "Kipe or come \n    up on.", "year": 2005, "comment": "What they are saying now."}]}, {"q": "How did your generation say \"to cheat, deceive\"?", "opts": [{"text": "Skin, \n    gyp.", "year": 1925, "comment": "Were you a flapper of the 20s?"}, {"text": "Boondoggle, gyp.", "year": 1935, "comment": "What you would hear in a speak-easy."}, {"text": "Sucker, \n    fleece, gyp.", "year": 1945, "comment": "Yes, we even had this during World War II.."}, {"text": "Con, \ntake.", "year": 1955, "comment": "Most popular in the 50s."}, {"text": "Hustle, \n    scam.", "year": 1965, "comment": "Subculture talk of the 60s."}, {"text": "Boone.", "year": 1995, "comment": "Around since the 90s."}]}, {"q": "What was the 'in' word for \"vomit\" in your HS-college \n  days?", "opts": [{"text": "Heave, puke, spew.", "year": 1925, "comment": "These words go back hundreds of years."}, {"text": "Chuck \n    up, spew, puke.", "year": 1940, "comment": "What martinis never made Nick Charles do in the 40s."}, {"text": "", "year": null, "comment": ""}, {"text": "Barf.", "year": 1955, "comment": "Came in on the duck tails of the 50s."}, {"text": "Upchuck.", "year": 1965, "comment": "The 60s just turned Chuck Up around."}, {"text": "Boot, bork, \n    toss lunch.", "year": 1975, "comment": "A rich choice in the 70s."}, {"text": "Hork, toss \n    your cookies.", "year": 1985, "comment": "More choices in the 80s."}, {"text": "Sell \n    buicks.", "year": 1995, "comment": "Desperation in the 90s?"}]}, {"q": "When someone annoyed you in HS or college, what did they \n  do?", "opts": [{"text": "Get on your \n    nerves.", "year": 1935, "comment": "Still around since the 30s."}, {"text": "Get \n    under your skin.", "year": 1940, "comment": "Cole Porter wrote the song in 1936."}, {"text": "Either \n    of the above", "year": 1955, "comment": "Pegged pants got on some people's nerves in the 50s."}, {"text": "Bug \n    or hassle.", "year": 1965, "comment": "Hottest new words during the Beatlemania years."}, {"text": "Rattle your \n    cage, pull your chain.", "year": 1975, "comment": "New phrases of the 70s."}, {"text": "Wear low.", "year": 1985, "comment": "Rappers in the 80s brought it down low."}, {"text": "Ig or ride \n    low.", "year": 1995, "comment": "The current hip-hop era."}]}, {"q": "What did your generation call an awkward, \n  unsophisticated person from the country?", "opts": [{"text": "Yahoo, rube.", "year": 1925, "comment": "Insult in the 20s, big name in the 90s."}, {"text": "Bumpkin, \n    hick, (dumb)cluck.", "year": 1940, "comment": "You heard Country Bumpkin in the 40s too."}, {"text": "Clod or clodhopper.", "year": 1955, "comment": "Big in the 50s, especially down south."}, {"text": "Klutz.", "year": 1965, "comment": "More of a Yankee word in the 60s."}, {"text": "Redneck.", "year": 1975, "comment": "Arose from the Civil Rights Movement in the 60s."}, {"text": "Bubba.", "year": 1985, "comment": "Began to hear this one in the 80s."}]}, {"q": "What was the \"in\" word for a stupid person when you \n  were in HS-college?", "opts": [{"text": "Dip, \n    ding-bat, bonehead, chump.", "year": 1935, "comment": "Ding-bat was still Archie Bunker's favorite in the 60s."}, {"text": "Fat-head, jerk, \n    sap, chump.", "year": 1945, "comment": "Bogie talk in the 40s."}, {"text": "Turkey, \n    chump, or meatball.", "year": 1955, "comment": "From the 1950s--the Elvis Era."}, {"text": "Dipstick, bozo, or \n    doofus.", "year": 1965, "comment": "Stick was added to Dip in the 60s."}, {"text": "Dork \n    or retard.", "year": 1975, "comment": "Computer geeks came up with DORK in the 70s."}, {"text": "Airhead, dip.", "year": 1985, "comment": "This one was added around 1980."}, {"text": "Unit, \n    doe, crackhead.", "year": 1995, "comment": "Crackhead became a more general term in the 90s."}, {"text": "Offie, ricky.", "year": 2005, "comment": "What the hip-hop generation says today."}]}, {"q": "What were weak, indecisive people called when you were \n  in HS-college?", "opts": [{"text": "Pantywaists.", "year": 1925, "comment": "An old, old word still alive in the 20s."}, {"text": "Drips.", "year": 1945, "comment": "Someone without a full flow in the 40s."}, {"text": "Wimps or douche \nbags.", "year": 1965, "comment": "These were the clean ones in the 60s."}, {"text": "Wussies or \n    candyasses (the sweet donkey).", "year": 1975, "comment": "Disco talk in the 70s."}, {"text": "Nonces.", "year": 1985, "comment": "Beginning in the 80s."}]}, {"q": "How did your HS-college generation ask what's \n  happening?", "opts": [{"text": "What's going \n    on?", "year": 1935, "comment": "Before and after the 30s."}, {"text": "What's \n    cooking?", "year": 1945, "comment": "In the 40s doing fine was cooking on gas."}, {"text": "What's \n    up?", "year": 1955, "comment": "Like, the surf in the 50s?"}, {"text": "What's \n    coming off or what's happening?", "year": 1965, "comment": "How it was handled in the 60s."}, {"text": "What's going down", "year": 1975, "comment": "The direction was reversed in the 70s."}, {"text": "What's popping?", "year": 1985, "comment": "What the rappers rapped in the 80s."}, {"text": "What's \n    cracking?", "year": 1995, "comment": "Hip-hopper talk of the 90s."}, {"text": "What's \n    craculating?", "year": 2005, "comment": "Bum Squad favorite today."}]}, {"q": "What was \"nonsense\" when you were in \nHS-college?", "opts": [{"text": "Humbug.", "year": 1915, "comment": "Scrooge's day to the turn of the century."}, {"text": "Applesauce or horse \n    feathers.", "year": 1925, "comment": "Fun in the 20s."}, {"text": "Bunk or \n    bunkum.", "year": 1935, "comment": "Words from politics of the 30s."}, {"text": "Baloney, \n    malarkey.", "year": 1945, "comment": "Popular in the 40s"}, {"text": "Crap, \n    garbage.", "year": 1955, "comment": "None of this for Mike Hammer in the 50s."}, {"text": "Crappola.", "year": 1975, "comment": "Worse than payola in the 70s."}, {"text": "Mush.", "year": 1995, "comment": "When the Beastie Boys reigned--the 90s"}, {"text": "None of the \n    above.", "year": 2005, "comment": "What is going on now?"}]}, {"q": "What did you and your friends spend when you were in HS \n  and college?", "opts": [{"text": "Jack, \n    rubes.", "year": 1925, "comment": "What the high steppers of the 20s needed."}, {"text": "Moolah, scratch.", "year": 1935, "comment": "What kept you running in the 30s."}, {"text": "Bucks, \n    dough, moolah.", "year": 1945, "comment": "Something you needed in your zoot suit in the 40s."}, {"text": "Wad.", "year": 1955, "comment": "As in a wad of bills in the 60s."}, {"text": "Bread.", "year": 1965, "comment": "Why did the flower kids of the 60s need money?"}, {"text": "Cheese, \n    chips, dineros, duckets, paper, bank.", "year": 1985, "comment": "U2 needed these in the 80s."}, {"text": "Cheddar, \n    chips, duckies, grain, feddie, grip, snaps.", "year": 1995, "comment": "What Public Enemy rapped about in the 90s."}, {"text": "Scrill, scrilla.", "year": 2005, "comment": "Latest fad."}]}, {"q": "What did (other) people call liquor when you were in HS \n  and college?", "opts": [{"text": "Giggle \n    water .", "year": 1925, "comment": "What they served at speak-easies in the 20s."}, {"text": "Hooch.", "year": 1935, "comment": "The word when you could not get any in the US."}, {"text": "Booze.", "year": 1945, "comment": "Started in the 40s and still around."}, {"text": "Juice or \n    sauce.", "year": 1955, "comment": "The Brando-Dean Era of the 50s"}, {"text": "Antifreeze.", "year": 1965, "comment": "Began in the 60s but not widely used."}]}, {"q": "What did you call people who throws the damper on \n  parties or other fun?", "opts": [{"text": "Wet \n    blanket, a rag.", "year": 1930, "comment": "The guy without a coonskin coat in the 30s."}, {"text": "Killjoy.", "year": 1945, "comment": "More popular in the 40s."}, {"text": "Party-pooper \n    or pooper.", "year": 1955, "comment": "The girl without a poodle skirt in the 50s."}, {"text": "Drag.", "year": 1965, "comment": "What held you back in the 60s."}]}, {"q": "How did you get in HS-college when you were \n  angry?", "opts": [{"text": "Hot.", "year": 1925, "comment": "The heat trend is set by the 20s."}, {"text": "Burned \n    up.", "year": 1935, "comment": "Things get hotter in the 30s."}, {"text": "Steamed \n    up.", "year": 1945, "comment": "Water is added in the 40s."}, {"text": "Peed off, \n    ticked off.", "year": 1955, "comment": "Heat is removed in the 50s."}, {"text": "Teed off, \n    ticked off.", "year": 1965, "comment": "Heat is off in the 60s."}, {"text": "Bent, twisted.", "year": 1975, "comment": "Focus on metaphorical shape in the 70s."}, {"text": "Frosted.", "year": 1985, "comment": "Things cool off even more in the 80s."}, {"text": "Lit, swoll, \n    tight.", "year": 1995, "comment": "Large selection in the 90s."}, {"text": "Left, \n    offed.", "year": 2005, "comment": "On the hip-hop scense today."}]}, {"q": "What did your generation call a jail or prison?", "opts": [{"text": "Hoosegow.", "year": 1925, "comment": "Still around but started in the 20s."}, {"text": "Pokey.", "year": 1935, "comment": "Still around but started in the 30s."}, {"text": "Joint, \n    can, clink.", "year": 1945, "comment": "All still current but started in the 40s."}, {"text": "Lockup, slammer.", "year": 1955, "comment": "New words from the Rock-n-roll era."}, {"text": "Joint.", "year": 1970, "comment": "This one began around the 60s."}]}, {"q": "What was the word for the human rear end in your \n  HS-college days?", "opts": [{"text": "Keister.", "year": 1935, "comment": "Still around but started in the 30s."}, {"text": "Rump, tail.", "year": 1945, "comment": "Focused in the 40s though still around."}, {"text": "Patootie.", "year": 1955, "comment": "Mostly in the north from the 50s on."}, {"text": "Buns, \n    wazoo.", "year": 1965, "comment": "The vision of the counterculture of the 60s."}, {"text": "Bootie.", "year": 1975, "comment": "Started with disco in the 70s."}]}];
+const era = [{"label": "1920s\u201330s", "color": "#6bb3ff", "start": 1900, "end": 1939}, {"label": "1940s", "color": "#6bffcf", "start": 1940, "end": 1949}, {"label": "1950s", "color": "#f6ff6b", "start": 1950, "end": 1959}, {"label": "1960s\u201370s", "color": "#ffc36b", "start": 1960, "end": 1979}, {"label": "1980s", "color": "#ff6b9f", "start": 1980, "end": 1989}, {"label": "1990s", "color": "#d36bff", "start": 1990, "end": 1999}, {"label": "2000s", "color": "#9b9bff", "start": 2000, "end": 2009}, {"label": "2010s+", "color": "#8fe388", "start": 2010, "end": 2099}];
+const yearsForQuips = {"1920": "Do you still wear your coonskin coat in winter?", "1930": "Are you still longing for Rudy Vallee and his \nmegaphone?", "1940": "Do you still think a road trip is a movie with Bing and \n  Bob.", "1950": "Does the thought of pegged pants and poodle skirts make you \n  tingle?", "1960": "Far out! I bet you miss the love-ins, sit-ins and \n  be-ins?", "1970": "Are you still hoping disco will come back?", "1980": "This must remind you of the fast times at Ridgemont \n  High.", "1990": "The Hip-Hop Generation has spoken!", "2000": "Hey, you're still wet behind the ears!"}; // mapping of representative years -> quip
+
+function eraIndexFromYear(y){
+  if(y==null) return 0;
+  for(let i=0;i<era.length;i++){
+    if(y>=era[i].start && y<=era[i].end) return i;
+  }
+  return era.length-1;
+}
+
+const quiz = document.getElementById('quiz');
+const totalCount = questions.length; document.getElementById('totalCount').textContent = totalCount;
+
+questions.forEach((item, qi)=>{
+  const card = document.createElement('div'); card.className='card';
+  const q = document.createElement('div'); q.className='q'; q.textContent = (qi+1)+'. '+item.q; card.appendChild(q);
+
+  item.opts.forEach((opt, oi)=>{
+    const label = document.createElement('label'); label.className='opt';
+    const input = document.createElement('input'); input.type='radio'; input.name=`q${qi}`; input.value=oi;
+    input.addEventListener('change', ()=>{ updateInline(qi, oi); updateOverall(); });
+    label.appendChild(input);
+    const span = document.createElement('span'); span.textContent = opt.text; label.appendChild(span);
+    card.appendChild(label);
+  });
+
+  const res = document.createElement('div'); res.id = `res_${qi}`; res.className='inline-result'; res.style.display='none';
+  card.appendChild(res);
+  quiz.appendChild(card);
+});
+
+function updateInline(qi, oi){
+  const res = document.getElementById(`res_${qi}`);
+  const opt = questions[qi].opts[oi];
+  const e = era[eraIndexFromYear(opt.year)];
+  res.style.display='block';
+  res.innerHTML = `<span class='era-badge' style='background:${e.color}'>${e.label}</span>`+
+                  `<strong>${opt.year}</strong> — ${opt.comment}`;
+}
+
+function updateOverall(){
+  let count=0, sum=0; const selectedYears=[];
+  questions.forEach((_, qi)=>{
+    const chosen = document.querySelector(`input[name=q${qi}]:checked`);
+    if(chosen){
+      const oi = parseInt(chosen.value,10);
+      const y = questions[qi].opts[oi].year; 
+      if(typeof y === 'number'){ sum += y; selectedYears.push(y); count++; }
+    }
+  });
+
+  document.getElementById('answeredCount').textContent = count;
+
+  if(count===0){
+    document.getElementById('overallEra').innerHTML = `<span class='era-badge'>—</span><strong>Overall era:</strong> <span id='overallEraText'>—</span>`;
+    document.getElementById('avgYear').textContent = '—';
+    document.getElementById('quipBox').textContent = '';
+    return;
+  }
+  const avg = Math.round(sum / count);
+  document.getElementById('avgYear').textContent = avg;
+  const e = era[eraIndexFromYear(avg)];
+  document.getElementById('overallEra').innerHTML = `<span class='era-badge' style='background:${e.color}'>${e.label}</span><strong>Overall era:</strong> <span id='overallEraText'>${e.label}</span>`;
+
+  let bestYear=null, bestDist=Infinity;
+  Object.keys(yearsForQuips).forEach(k=>{
+    const y=parseInt(k,10); const d=Math.abs(y-avg); if(d<bestDist){bestDist=d;bestYear=y;}
+  });
+  const quip = bestYear? yearsForQuips[bestYear] : '';
+  document.getElementById('quipBox').textContent = quip || '';
+}
+
+const resetBtn = document.getElementById('resetBtn');
+resetBtn.addEventListener('click', ()=>{
+  document.querySelectorAll('input[type=radio]').forEach(i=> i.checked=false);
+  document.querySelectorAll('.inline-result').forEach(el=>{el.style.display='none'; el.innerHTML='';});
+  updateOverall();
+});
+</script>
+</body></html>

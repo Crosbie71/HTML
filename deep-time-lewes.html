@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deep Time from Lewes</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink: #0d0d0f;
+    --paper: #f5f0e8;
+    --amber: #c8832a;
+    --amber-dim: #8a5a1c;
+    --rust: #8b3a2a;
+    --cream: #ede8dc;
+    --muted: #6b6455;
+    --glow: rgba(200, 131, 42, 0.15);
+  }
+
+  body {
+    font-family: 'DM Mono', monospace;
+    background: var(--ink);
+    color: var(--paper);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    padding: 14px 24px 10px;
+    border-bottom: 1px solid rgba(200,131,42,0.2);
+    display: flex;
+    align-items: baseline;
+    gap: 20px;
+    flex-shrink: 0;
+	background: var(--ink);
+    z-index: 1000;
+  }
+
+  header h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.6rem;
+    font-weight: 400;
+    color: var(--amber);
+    letter-spacing: 0.02em;
+  }
+
+  header .scale-note {
+    font-size: 0.8rem;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 340px;
+    flex-shrink: 0;
+    overflow-y: auto;
+    border-right: 1px solid rgba(200,131,42,0.15);
+    background: #0f0f12;
+    scrollbar-width: thin;
+    scrollbar-color: var(--amber-dim) transparent;
+  }
+
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--amber-dim); border-radius: 2px; }
+
+  .event-item {
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    cursor: pointer;
+    transition: background 0.2s;
+    position: relative;
+  }
+
+  .event-item:hover { background: rgba(200,131,42,0.06); }
+
+  .event-item.active {
+    background: rgba(200,131,42,0.12);
+    border-left: 3px solid var(--amber);
+  }
+  .event-item:not(.active) { border-left: 3px solid transparent; }
+
+  .event-item .era {
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 4px;
+  }
+
+  .event-item h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem;
+    font-weight: 400;
+    color: var(--paper);
+    margin-bottom: 4px;
+    line-height: 1.3;
+  }
+
+  .event-item .time-ago {
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  .event-item .distance {
+    font-size: 0.85rem;
+    color: var(--amber);
+    font-weight: 400;
+  }
+
+  .event-item .location-label {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .event-item .description {
+    font-size: 0.82rem;
+    color: #9a9080;
+    margin-top: 8px;
+    line-height: 1.6;
+    display: none;
+  }
+
+  .event-item.active .description { display: block; }
+
+  /* MAP */
+  #map {
+    flex: 1;
+    background: #111;
+    position: relative;
+  }
+
+  /* Info overlay on map */
+  .map-overlay {
+    position: absolute;
+    bottom: 24px;
+    right: 24px;
+    background: rgba(13,13,15,0.92);
+    border: 1px solid rgba(200,131,42,0.3);
+    border-radius: 4px;
+    padding: 14px 18px;
+    z-index: 800;
+    max-width: 280px;
+    backdrop-filter: blur(4px);
+  }
+
+  .map-overlay .overlay-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.2rem;
+    color: var(--amber);
+    margin-bottom: 4px;
+  }
+
+  .map-overlay .overlay-dist {
+    font-size: 0.85rem;
+    color: var(--paper);
+    margin-bottom: 6px;
+  }
+
+  .map-overlay .overlay-place {
+    font-size: 0.78rem;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  /* Board marker */
+  .board-note {
+    position: absolute;
+    bottom: 40px;
+    left: 16px;
+    z-index: 800;
+    background: rgba(13,13,15,0.88);
+    border: 1px solid rgba(200,131,42,0.25);
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: 0.75rem;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .board-note span { color: var(--amber); }
+
+  /* Leaflet overrides */
+  .leaflet-tile-pane { filter: grayscale(0.7) brightness(0.45) sepia(0.2); }
+  .leaflet-control-attribution { display: none; }
+  .leaflet-control-zoom a {
+    background: #1a1a1f !important;
+    color: var(--amber) !important;
+    border-color: rgba(200,131,42,0.3) !important;
+  }
+
+  .pulse-dot {
+    width: 12px; height: 12px;
+    background: var(--amber);
+    border-radius: 50%;
+    box-shadow: 0 0 0 0 rgba(200,131,42,0.6);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(200,131,42,0.6); }
+    70% { box-shadow: 0 0 0 10px rgba(200,131,42,0); }
+    100% { box-shadow: 0 0 0 0 rgba(200,131,42,0); }
+  }
+
+  /* timeline scrubber at bottom */
+  .scrubber {
+    position: absolute;
+    bottom: 0;
+    left: 340px;
+    right: 0;
+    height: 32px;
+    background: rgba(13,13,15,0.9);
+    border-top: 1px solid rgba(200,131,42,0.15);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 8px;
+    z-index: 800;
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+  }
+
+  .scrubber input[type=range] {
+    flex: 1;
+    accent-color: var(--amber);
+    cursor: pointer;
+  }
+  
+  /* Light Mode Variables */
+body.light-mode {
+  --ink: #f5f0e8;
+  --paper: #1a1a1f;
+  --amber: #8a5a1c;
+  --amber-dim: #c8832a;
+  --cream: #dcd7cc;
+  --muted: #555045;
+  --glow: rgba(138, 90, 28, 0.1);
+}
+
+body.light-mode header {
+  border-bottom: 1px solid rgba(138, 90, 28, 0.2);
+}
+
+body.light-mode .scrubber {
+  background: var(--ink);
+  border-top: 1px solid rgba(138, 90, 28, 0.2);
+}
+
+/* This ensures the scale-note (e.g., "1 year = 2mm") remains visible */
+body.light-mode .scale-note {
+  color: var(--muted);
+}
+
+/* Specific overrides for light mode */
+body.light-mode .sidebar { background: #ede8dc; }
+body.light-mode .event-item:hover { background: rgba(0,0,0,0.05); }
+body.light-mode .event-item.active { background: rgba(200, 131, 42, 0.1); }
+body.light-mode .leaflet-tile-pane { filter: sepia(0.2) brightness(1.1); }
+body.light-mode .map-overlay { background: rgba(245, 240, 232, 0.95); }
+
+/* The Toggle Button */
+.theme-toggle {
+  margin-left: auto;
+  padding: 6px 12px;
+  background: var(--amber);
+  color: var(--ink);
+  border: none;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  cursor: pointer;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Rotate the map so South is Up and East is Left */
+body.rotated #map {
+  transform: rotate(180deg);
+}
+
+/* Keep UI elements, text, and markers from being upside down */
+body.rotated .map-overlay, 
+body.rotated .leaflet-control-zoom,
+body.rotated .pulse-dot,
+body.rotated .leaflet-marker-icon,
+body.rotated .leaflet-tooltip {
+  transform: rotate(-180deg);
+}
+
+/* Ensure the "glow" pulse is centered after rotation */
+body.rotated .pulse-dot {
+  transform: rotate(-180deg) translate(-50%, -50%);
+  transform-origin: top left;
+}
+
+/* Rotate the map container */
+body.rotated #map {
+  transform: rotate(180deg);
+  transition: transform 0.5s ease; /* Smooth transition */
+}
+
+/* Counter-rotate all UI and text elements to keep them readable */
+body.rotated .map-overlay, 
+body.rotated .leaflet-control-zoom,
+body.rotated .leaflet-marker-icon,
+body.rotated .leaflet-tooltip-container,
+body.rotated .pulse-dot {
+  transform: rotate(-180deg);
+}
+
+/* Specific fix for the overlay positioning */
+body.rotated .map-overlay {
+  /* This ensures the box stays anchored correctly despite the flip */
+  transform-origin: center;
+}
+
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Deep Time from Lewes</h1>
+  <span class="scale-note">2 metre board = 1,000 years ...</span>
+  <button class="theme-toggle" onclick="toggleTheme()">Switch Theme</button>
+  <button class="theme-toggle" onclick="document.body.classList.toggle('rotated')">Rotate for South Wall</button>
+</header>
+
+<div class="main" style="position:relative;">
+  <div class="sidebar" id="sidebar"></div>
+  <div id="map">
+  </div>
+
+  <div class="map-overlay" id="mapOverlay">
+    <div class="overlay-title" id="overlayTitle">—</div>
+    <div class="overlay-dist" id="overlayDist">—</div>
+    <div class="overlay-place" id="overlayPlace">—</div>
+  </div>
+
+  <div class="scrubber">
+    <span>Now</span>
+    <input type="range" id="scrubber" min="0" max="0" value="0" step="1">
+    <span>4.5bn yrs ago</span>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ── DATA ──────────────────────────────────────────────────────────────────────
+// East Sussex College, Mountfield Road, Lewes (///tabs.orbited.secret)
+const LEWES = [50.87017602102685, 0.015231254889895851];
+
+const EVENTS = [
+  {
+    era: "Your board",
+    title: "Now — 1066 AD",
+    yearsAgo: 0,
+    distMetres: 0,
+    distLabel: "0 – 2 metres",
+    locationLabel: "Your classroom. The full board.",
+    description: "Your entire 2-metre whiteboard covers this window. The Norman Conquest is the far edge. Old English, the Lewes martyrs, the Reformation — all within arm's reach on the wall.",
+    zoom: 19,
+  },
+  {
+    era: "Roman Britain",
+    title: "Roman Empire",
+    yearsAgo: 2000,
+    distMetres: 4,
+    distLabel: "4 metres",
+    locationLabel: "Just outside your classroom door",
+    description: "Step into the corridor. Rome is governing Britain. Fishbourne Roman Palace — the grandest building north of the Alps — is being built 10 miles away. Latin is the prestige language; local Britons speak Brittonic Celtic.",
+    zoom: 19,
+  },
+  {
+    era: "Ancient Egypt",
+    title: "The Pyramids",
+    yearsAgo: 4500,
+    distMetres: 9,
+    distLabel: "9 metres",
+    locationLabel: "Outside the hallway window",
+    description: "The Great Pyramid of Giza is under construction. In Sussex, people are raising burial mounds on the Downs above Lewes — different monuments, same impulse toward memory and death. No writing yet in Britain.",
+    zoom: 19,
+  },
+  {
+    era: "First Writing",
+    title: "First Civilisations — Sumer",
+    yearsAgo: 6000,
+    distMetres: 12,
+    distLabel: "12 metres",
+    locationLabel: "Somewhere in the college quad",
+    description: "Cuneiform writing is just being invented in Mesopotamia. Before this point on your walk, no human thought was ever written down. Everything was spoken, sung, or held in memory. Language is ancient. Writing is brand new.",
+    zoom: 19,
+  },
+  {
+    era: "Ice Age Art",
+    title: "Lascaux Cave Paintings",
+    yearsAgo: 35000,
+    distMetres: 70,
+    distLabel: "70 metres",
+    locationLabel: "Right across Cliffe Building, or out into the Car Park",
+    description: "You're at the Grange gardens. The painters of Lascaux — horses, aurochs, deer rendered with extraordinary skill — are almost certainly using complex language. The cognitive architecture for that art is the same architecture needed for metaphor and syntax. These people were us.",
+    zoom: 18,
+  },
+  {
+    era: "Our Species",
+    title: "Early Homo Sapiens",
+    yearsAgo: 300000,
+    distMetres: 600,
+    distLabel: "600 metres",
+    locationLabel: "Over the river Ouse, up onto the Downs",
+    description: "You've crossed the valley. Our species exists — small groups in Africa. The hyoid bone that enables complex speech is present. When did language begin? Genuinely one of the hardest questions in science. There is no fossil record for words.",
+    zoom: 14,
+  },
+  {
+    era: "Neanderthals",
+    title: "Neanderthals",
+    yearsAgo: 400000,
+    distMetres: 800,
+    distLabel: "800 metres",
+    locationLabel: "Out on the open downland above Lewes",
+    description: "Neanderthals had the hyoid bone. They buried their dead. They made jewellery. Did they have language? Probably something — but we genuinely don't know. On this scale they're a 10-minute walk. Barely distant at all.",
+    zoom: 14,
+  },
+  {
+    era: "Human Family",
+    title: "First Stone Tools — Homo Habilis",
+    yearsAgo: 2500000,
+    distMetres: 5000,
+    distLabel: "5 kilometres",
+    locationLabel: "Over the Downs, past Glynde, past Ringmer",
+    description: "The first deliberately shaped stone tools. Our earliest surviving technology. You'd be somewhere above Falmer or the edge of Brighton — a walk over the hills from Lewes.",
+    zoom: 11,
+  },
+  {
+    era: "Primate Origins",
+    title: "Human / Chimp Common Ancestor",
+    yearsAgo: 7000000,
+    distMetres: 14000,
+    distLabel: "14 kilometres",
+    locationLabel: "Around Uckfield or Burgess Hill",
+    description: "The last ancestor we shared with chimpanzees. A longish bike ride from the classroom. Everything since — all of human evolution, all of prehistory, every language ever spoken — happened in 14km.",
+    zoom: 10,
+  },
+  {
+    era: "Reptile Age",
+    title: "Dinosaurs — Extinction",
+    yearsAgo: 66000000,
+    distMetres: 132000,
+    distLabel: "132 kilometres",
+    locationLabel: "Over the English Channel — as far as Calais",
+    description: "The asteroid hits. Non-avian dinosaurs are wiped out. Heading east from Lewes you're somewhere over the Channel or into northern France. Everything that makes us human — every language, every civilisation, every word ever written — happened in the last 12 metres of a 132km journey.",
+    zoom: 8,
+  },
+  {
+    era: "Reptile Age",
+    title: "Dinosaurs — First Appear",
+    yearsAgo: 230000000,
+    distMetres: 460000,
+    distLabel: "460 kilometres",
+    locationLabel: "Western Germany",
+    description: "Dinosaurs first evolve from early archosaurs. Heading east you're deep into Germany — Frankfurt or beyond. The world looks nothing like anything alive today.",
+    zoom: 6,
+  },
+  {
+    era: "Animal Life",
+    title: "Cambrian Explosion",
+    yearsAgo: 540000000,
+    distMetres: 1080000,
+    distLabel: "1,080 kilometres",
+    locationLabel: "Czech Republic — around Prague",
+    description: "Eyes, legs, shells, predators — all of animal complexity essentially invented simultaneously. Before this point, nothing you could see with the naked eye existed on Earth. You're over the Czech Republic, roughly above Prague.",
+    zoom: 5,
+  },
+  {
+    era: "Complex Life",
+    title: "First Multicellular Life",
+    yearsAgo: 800000000,
+    distMetres: 1600000,
+    distLabel: "1,600 kilometres",
+    locationLabel: "Western Ukraine / Moldova",
+    description: "The first organisms made of more than one cell. Before this point, every living thing on Earth was a single cell — invisible, simple, alone. More than half of Earth's entire history passed with nothing more complex than bacteria. You're over western Ukraine.",
+    zoom: 4,
+  },
+  {
+    era: "Life Itself",
+    title: "First Life on Earth",
+    yearsAgo: 3800000000,
+    distMetres: 7600000,
+    distLabel: "7,600 kilometres",
+    locationLabel: "Bay of Bengal — as far as India",
+    description: "Simple bacteria. The spark of life. Heading due east from Lewes you've crossed all of Europe, all of Russia, and you're over the Bay of Bengal, approaching India. The journey back to the classroom contains everything — every creature, every thought, every civilisation.",
+    zoom: 3,
+  },
+  {
+    era: "Earth Forms",
+    title: "Formation of the Earth",
+    yearsAgo: 4500000000,
+    distMetres: 9000000,
+    distLabel: "9,000 kilometres",
+    locationLabel: "Indian Ocean — south of Sri Lanka",
+    description: "The Earth coalesces from dust and rock around the young Sun. Nothing alive. No oceans yet. You're over the Indian Ocean, south of Sri Lanka. Your classroom in Lewes — and all of time — is 9,000km back to the west.",
+    zoom: 3,
+  },
+];
+
+// ── GEOMETRY HELPERS ──────────────────────────────────────────────────────────
+// Given an origin [lat,lng], a bearing in degrees (0=N, 90=E), and a distance
+// in metres, returns the destination [lat, lng] using the Haversine formula.
+function destinationPoint(origin, bearingDeg, distMetres) {
+  const R = 6371000; // Earth radius in metres
+  const δ = distMetres / R;
+  const θ = bearingDeg * Math.PI / 180;
+  const φ1 = origin[0] * Math.PI / 180;
+  const λ1 = origin[1] * Math.PI / 180;
+  const φ2 = Math.asin(Math.sin(φ1)*Math.cos(δ) + Math.cos(φ1)*Math.sin(δ)*Math.cos(θ));
+  const λ2 = λ1 + Math.atan2(Math.sin(θ)*Math.sin(δ)*Math.cos(φ1), Math.cos(δ)-Math.sin(φ1)*Math.sin(φ2));
+  return [φ2 * 180 / Math.PI, λ2 * 180 / Math.PI];
+}
+
+// Bearing east (90°) — heads through France, Germany, Russia, Siberia, Pacific
+const BEARING = 90;
+
+// ── MAP SETUP ─────────────────────────────────────────────────────────────────
+const map = L.map('map', {
+  center: LEWES,
+  zoom: 15,
+  zoomControl: true,
+});
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+}).addTo(map);
+
+// Lewes pin — always visible
+const lewesIcon = L.divIcon({
+  html: '<div class="pulse-dot"></div>',
+  iconSize: [12, 12],
+  iconAnchor: [6, 6],
+  className: '',
+});
+L.marker(LEWES, { icon: lewesIcon, zIndexOffset: 1000 })
+  .bindTooltip('East Sussex College, Mountfield Road', { permanent: false })
+  .addTo(map);
+
+let circleLayer = null;
+let targetMarker = null;
+let linePath = null;
+
+function formatYears(y) {
+  if (y === 0) return 'Present day';
+  if (y < 1000) return `${y} years ago`;
+  if (y < 1000000) return `${(y/1000).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,',')}k years ago`;
+  if (y < 1000000000) return `${(y/1000000).toFixed(0)}m years ago`;
+  return `${(y/1000000000).toFixed(1)}bn years ago`;
+}
+
+function selectEvent(idx) {
+  document.querySelectorAll('.event-item').forEach((el, i) => {
+    el.classList.toggle('active', i === idx);
+    if (i === idx) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
+
+  const ev = EVENTS[idx];
+
+  // remove old layers
+  if (circleLayer) { map.removeLayer(circleLayer); circleLayer = null; }
+  if (targetMarker) { map.removeLayer(targetMarker); targetMarker = null; }
+  if (linePath)    { map.removeLayer(linePath);    linePath = null; }
+
+  if (ev.distMetres <= 2) {
+    // Just show Lewes
+    map.flyTo(LEWES, ev.zoom, { duration: 1.2, easeLinearity: 0.4 });
+  } else {
+    // Compute the point exactly on the circle edge in the BEARING direction
+    const dest = destinationPoint(LEWES, BEARING, ev.distMetres);
+
+    // Circle centred on Lewes
+    circleLayer = L.circle(LEWES, {
+      radius: ev.distMetres,
+      color: '#c8832a',
+      weight: 1.5,
+      opacity: 0.4,
+      fill: false,
+      dashArray: '4 6',
+    }).addTo(map);
+
+    // Line from Lewes to dest
+    linePath = L.polyline([LEWES, dest], {
+      color: '#c8832a',
+      weight: 3,
+      opacity: 0.85,
+    }).addTo(map);
+
+    // Marker exactly on the circle edge
+    const destIcon = L.divIcon({
+      html: `<div style="width:11px;height:11px;background:#c8832a;border-radius:50%;border:2px solid #f5f0e8;box-shadow:0 0 6px rgba(200,131,42,0.8)"></div>`,
+      iconSize: [11,11], iconAnchor: [5,5], className: '',
+    });
+    targetMarker = L.marker(dest, { icon: destIcon }).addTo(map);
+
+    // Fly to midpoint between Lewes and dest, at appropriate zoom
+    map.flyTo(dest, ev.zoom, { duration: 1.4, easeLinearity: 0.4 });
+  }
+
+  // update overlay
+  document.getElementById('overlayTitle').textContent = ev.title;
+  document.getElementById('overlayDist').textContent = `${ev.distLabel} from the classroom`;
+  document.getElementById('overlayPlace').textContent = ev.locationLabel;
+
+  // scrubber
+  document.getElementById('scrubber').value = idx;
+}
+
+// ── SIDEBAR BUILD ─────────────────────────────────────────────────────────────
+const sidebar = document.getElementById('sidebar');
+const scrubber = document.getElementById('scrubber');
+scrubber.max = EVENTS.length - 1;
+
+EVENTS.forEach((ev, i) => {
+  const div = document.createElement('div');
+  div.className = 'event-item';
+  div.innerHTML = `
+    <div class="era">${ev.era}</div>
+    <h3>${ev.title}</h3>
+    <div class="time-ago">${formatYears(ev.yearsAgo)}</div>
+    <div class="distance">${ev.distLabel}</div>
+    <div class="location-label">${ev.locationLabel}</div>
+    <div class="description">${ev.description}</div>
+  `;
+  div.addEventListener('click', () => selectEvent(i));
+  sidebar.appendChild(div);
+});
+
+scrubber.addEventListener('input', e => selectEvent(+e.target.value));
+
+// init
+selectEvent(0);
+function toggleTheme() {
+  document.body.classList.toggle('light-mode');
+  
+  // Optional: Update Leaflet map tiles to look better in light mode
+  // If you want to swap the actual map style, you can re-run L.tileLayer
+}
+</script>
+</body>
+</html>

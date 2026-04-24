@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  body, html {
+    margin: 0; padding: 0;
+    width: 100vw; height: 100vh;
+    overflow: hidden;
+    background: #fcfcfc;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+  }
+  h1 { margin: 0 0 6px; font-size: 2rem; color: #111; letter-spacing: -0.025em; }
+  p  { margin: 0 0 18px; color: #6b7280; font-size: 1rem; }
+  #map { position: relative; }
+  .box {
+    position: absolute;
+    background: #fff;
+    border: 2px solid #d1d5db;
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 600; font-size: 1.2rem;
+    cursor: pointer; user-select: none;
+    transition: border-color .2s, background .2s, box-shadow .2s, transform .2s;
+    z-index: 10; box-sizing: border-box;
+  }
+  .box.highlight {
+    border-color: #d32f2f; border-width: 3px;
+    background: #fff8f8;
+    box-shadow: 0 8px 20px rgba(211,47,47,.18);
+    transform: scale(1.03);
+  }
+  svg {
+    position: absolute; inset: 0;
+    overflow: visible; pointer-events: none; z-index: 1;
+  }
+  .line  { stroke: #d1d5db; stroke-width: 6; fill: none; pointer-events: stroke; cursor: pointer; }
+  .line.active  { stroke: #d32f2f; }
+  .arrow { fill: #d1d5db; pointer-events: none; }
+  .arrow.active { fill: #d32f2f; }
+</style>
+</head>
+<body>
+<div style="text-align:center">
+  <h1>Communication Flow Map</h1>
+  <p>Click boxes or arrows to highlight connections. Click background to reset.</p>
+</div>
+<div id="map"></div>
+
+<script>
+// ── Layout ────────────────────────────────────────────────────────
+const BW = 220, BH = 86;   // box size
+const GAP_X = 140;          // horizontal gap between the two columns
+const GAP_Y = 70;           // vertical gap between rows
+
+const MAP_W = BW * 2 + GAP_X;  // 580
+const MAP_H = BH * 4 + GAP_Y * 3;  // 554
+
+const col1L = 0,         col2L = BW + GAP_X;   // left edges
+const col1C = BW / 2,    col2C = col2L + BW/2; // centers x=110, x=470
+const rowC  = r => r * (BH + GAP_Y) + BH / 2; // center y per row
+
+// home spans full width so its vertical center-x matches each column center
+const homeW = MAP_W;
+
+const map = document.getElementById('map');
+map.style.width  = MAP_W + 'px';
+map.style.height = MAP_H + 'px';
+
+function makeBox(id, left, top, w, label) {
+  const d = document.createElement('div');
+  d.className = 'box'; d.id = id;
+  Object.assign(d.style, { left:left+'px', top:top+'px', width:w+'px', height:BH+'px' });
+  d.textContent = label;
+  map.appendChild(d);
+}
+
+const rowT = r => r * (BH + GAP_Y);
+makeBox('m1',   col1L, rowT(0), BW, 'manager');
+makeBox('m2',   col2L, rowT(0), BW, 'manager');
+makeBox('t1',   col1L, rowT(1), BW, 'teacher');
+makeBox('t2',   col2L, rowT(1), BW, 'teacher');
+makeBox('s1',   col1L, rowT(2), BW, 'student');
+makeBox('s2',   col2L, rowT(2), BW, 'student');
+makeBox('home', 0,     rowT(3), homeW, 'home');
+
+// Exact box-center lookup
+const C = {
+  m1:[col1C,rowC(0)], m2:[col2C,rowC(0)],
+  t1:[col1C,rowC(1)], t2:[col2C,rowC(1)],
+  s1:[col1C,rowC(2)], s2:[col2C,rowC(2)],
+  home:[MAP_W/2, rowC(3)],
+};
+const HW = id => id==='home' ? homeW/2 : BW/2;
+const HH = BH/2;
+
+// ── Arrow geometry ────────────────────────────────────────────────
+const AW = 14, AL = 20;  // arrowhead half-width & length (larger heads)
+
+function arrowPoly(x1,y1,x2,y2) {
+  const dx=x2-x1, dy=y2-y1, len=Math.hypot(dx,dy)||1;
+  const ux=dx/len, uy=dy/len, px=-uy, py=ux;
+  const bx=x2-ux*AL, by=y2-uy*AL;
+  return `${x2},${y2} ${bx+px*AW},${by+py*AW} ${bx-px*AW},${by-py*AW}`;
+}
+
+// Get the point on the edge of box `id` facing toward `towardId`, offset laterally by `off`
+function edgePt(id, towardId, off) {
+  const [cx,cy]=C[id], [tx,ty]=C[towardId];
+  const dx=tx-cx, dy=ty-cy;
+  if (Math.abs(dy) >= Math.abs(dx)) {
+    return [cx+off, cy+(dy>0?1:-1)*HH];
+  } else {
+    return [cx+(dx>0?1:-1)*HW(id), cy+off];
+  }
+}
+
+// ── Connections ───────────────────────────────────────────────────
+// For vertical pairs we want the arrows to be in the same x-column as
+// teacher↔student, so we pin the x explicitly.
+// Left column arrows: forward at x=col1C-14, return at x=col1C+14
+// Right column arrows: forward at x=col2C-14, return at x=col2C+14
+
+function vPair(fId, tId, cx, yf_bot, yf_top, yt_top, yt_bot) {
+  // fwd: bottom of f -> top of t  (descending)
+  // rev: top of t -> bottom of f  (ascending) — but arrows go up
+  return [
+    { id:`${fId}-${tId}`, x1:cx-14, y1:yf_bot, x2:cx-14, y2:yt_top },
+    { id:`${tId}-${fId}`, x1:cx+14, y1:yt_top, x2:cx+14, y2:yf_bot },
+  ];
+}
+
+// Build all straight line segments as {id,x1,y1,x2,y2}
+const segs = [];
+
+// Horizontal manager row
+segs.push({id:'m1-m2', x1:col1L+BW, y1:rowC(0)-8, x2:col2L, y2:rowC(0)-8});
+segs.push({id:'m2-m1', x1:col2L,    y1:rowC(0)+8, x2:col1L+BW, y2:rowC(0)+8});
+// Horizontal teacher row
+segs.push({id:'t1-t2', x1:col1L+BW, y1:rowC(1)-8, x2:col2L, y2:rowC(1)-8});
+segs.push({id:'t2-t1', x1:col2L,    y1:rowC(1)+8, x2:col1L+BW, y2:rowC(1)+8});
+// Horizontal student row
+segs.push({id:'s1-s2', x1:col1L+BW, y1:rowC(2)-8, x2:col2L, y2:rowC(2)-8});
+segs.push({id:'s2-s1', x1:col2L,    y1:rowC(2)+8, x2:col1L+BW, y2:rowC(2)+8});
+
+// Vertical left column: manager↔teacher, teacher↔student, student↔home
+// All pinned to x = col1C ± 14
+const lx = col1C; // 110
+segs.push({id:'m1-t1', x1:lx-14, y1:rowT(0)+BH, x2:lx-14, y2:rowT(1)});
+segs.push({id:'t1-m1', x1:lx+14, y1:rowT(1),    x2:lx+14, y2:rowT(0)+BH});
+segs.push({id:'t1-s1', x1:lx-14, y1:rowT(1)+BH, x2:lx-14, y2:rowT(2)});
+segs.push({id:'s1-t1', x1:lx+14, y1:rowT(2),    x2:lx+14, y2:rowT(1)+BH});
+segs.push({id:'s1-home', x1:lx-14, y1:rowT(2)+BH, x2:lx-14, y2:rowT(3)});
+segs.push({id:'home-s1', x1:lx+14, y1:rowT(3),    x2:lx+14, y2:rowT(2)+BH});
+
+// Vertical right column: same but x = col2C ± 14
+const rx = col2C; // 470
+segs.push({id:'m2-t2', x1:rx-14, y1:rowT(0)+BH, x2:rx-14, y2:rowT(1)});
+segs.push({id:'t2-m2', x1:rx+14, y1:rowT(1),    x2:rx+14, y2:rowT(0)+BH});
+segs.push({id:'t2-s2', x1:rx-14, y1:rowT(1)+BH, x2:rx-14, y2:rowT(2)});
+segs.push({id:'s2-t2', x1:rx+14, y1:rowT(2),    x2:rx+14, y2:rowT(1)+BH});
+segs.push({id:'s2-home', x1:rx-14, y1:rowT(2)+BH, x2:rx-14, y2:rowT(3)});
+segs.push({id:'home-s2', x1:rx+14, y1:rowT(3),    x2:rx+14, y2:rowT(2)+BH});
+
+// Roundabout connections — polylines with explicit waypoints
+const OL = -60, OR = MAP_W + 60;
+const round = [
+  { id:'m1-s1', f:'m1', t:'s1',
+    pts:[[col1L, rowC(0)-9],[OL, rowC(0)-9],[OL, rowC(2)-9],[col1L, rowC(2)-9]] },
+  { id:'s1-m1', f:'s1', t:'m1',
+    pts:[[col1L, rowC(2)+9],[OL-16, rowC(2)+9],[OL-16, rowC(0)+9],[col1L, rowC(0)+9]] },
+  { id:'t2-home', f:'t2', t:'home',
+    pts:[[col2L+BW, rowC(1)-9],[OR, rowC(1)-9],[OR, rowC(3)-9],[MAP_W, rowC(3)-9]] },
+  { id:'home-t2', f:'home', t:'t2',
+    pts:[[MAP_W, rowC(3)+9],[OR+16, rowC(3)+9],[OR+16, rowC(1)+9],[col2L+BW, rowC(1)+9]] },
+];
+
+// ── Build SVG ─────────────────────────────────────────────────────
+const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+svg.setAttribute('viewBox',`0 0 ${MAP_W} ${MAP_H}`);
+map.appendChild(svg);
+
+const lineEls={}, arrowEls={};
+
+function addSeg(id,x1,y1,x2,y2) {
+  const ln=document.createElementNS('http://www.w3.org/2000/svg','line');
+  ln.setAttribute('x1',x1); ln.setAttribute('y1',y1);
+  ln.setAttribute('x2',x2); ln.setAttribute('y2',y2);
+  ln.classList.add('line'); ln.dataset.id=id;
+  svg.appendChild(ln); lineEls[id]=ln;
+  const poly=document.createElementNS('http://www.w3.org/2000/svg','polygon');
+  poly.setAttribute('points',arrowPoly(x1,y1,x2,y2));
+  poly.classList.add('arrow'); poly.dataset.id=id;
+  svg.appendChild(poly); arrowEls[id]=poly;
+}
+
+segs.forEach(s=>addSeg(s.id,s.x1,s.y1,s.x2,s.y2));
+
+round.forEach(c=>{
+  const pts=c.pts;
+  const pl=document.createElementNS('http://www.w3.org/2000/svg','polyline');
+  pl.setAttribute('points',pts.map(p=>p.join(',')).join(' '));
+  pl.classList.add('line'); pl.dataset.id=c.id;
+  svg.appendChild(pl); lineEls[c.id]=pl;
+  const n=pts.length;
+  const poly=document.createElementNS('http://www.w3.org/2000/svg','polygon');
+  poly.setAttribute('points',arrowPoly(pts[n-2][0],pts[n-2][1],pts[n-1][0],pts[n-1][1]));
+  poly.classList.add('arrow'); poly.dataset.id=c.id;
+  svg.appendChild(poly); arrowEls[c.id]=poly;
+});
+
+const fromTo = {};
+segs.forEach(s=>{ fromTo[s.id]={f:s.id.split('-')[0],t:s.id.split('-')[1]}; });
+round.forEach(c=>{ fromTo[c.id]={f:c.f,t:c.t}; });
+
+// ── Interaction ───────────────────────────────────────────────────
+let sel=null;
+function resetAll(){
+  document.querySelectorAll('.line,.arrow').forEach(e=>e.classList.remove('active'));
+  document.querySelectorAll('.box').forEach(b=>b.classList.remove('highlight'));
+  sel=null;
+}
+function activate(id){ lineEls[id]?.classList.add('active'); arrowEls[id]?.classList.add('active'); }
+
+document.body.addEventListener('click',resetAll);
+map.addEventListener('click',e=>e.stopPropagation());
+
+document.querySelectorAll('.box').forEach(box=>{
+  box.addEventListener('click',()=>{
+    if(!sel){ resetAll(); sel=box.id; box.classList.add('highlight'); }
+    else if(sel===box.id){ resetAll(); }
+    else{
+      const fwd=`${sel}-${box.id}`, rev=`${box.id}-${sel}`;
+      let found=false;
+      if(lineEls[fwd]){activate(fwd);found=true;}
+      if(lineEls[rev]){activate(rev);found=true;}
+      if(found){ document.getElementById(sel).classList.add('highlight'); box.classList.add('highlight'); sel=null; }
+      else{ resetAll(); sel=box.id; box.classList.add('highlight'); }
+    }
+  });
+});
+
+svg.addEventListener('click',e=>{
+  const id=e.target.dataset.id; if(!id)return;
+  resetAll(); activate(id);
+  const c=fromTo[id];
+  if(c){ document.getElementById(c.f)?.classList.add('highlight'); document.getElementById(c.t)?.classList.add('highlight'); }
+});
+</script>
+</body>
+</html>

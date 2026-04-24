@@ -1,0 +1,49 @@
+
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Roman Numerals Practice</title>
+<style>
+  body { font-family: system-ui, sans-serif; background:#0b1020; color:#eef2ff; margin:0; padding:1rem; }
+  h1 { text-align:center; }
+  .controls { text-align:center; margin-bottom:1rem; }
+  .grid { display:grid; grid-template-columns:1fr; gap:1rem; max-width:800px; margin:0 auto; }
+  .card { background:#121a36; padding:1rem; border-radius:12px; border:1px solid #223066; }
+  .roman { font-size:3rem; text-align:center; font-weight:900; margin-bottom:.5rem; }
+  .answer { display:none; margin-top:.5rem; font-size:2rem; color:#ffd166; text-align:center; font-weight:700; }
+  button { padding:.5rem .8rem; border:none; border-radius:8px; cursor:pointer; font-size:1rem; }
+  .reveal-btn { background:#1b4fb0; color:white; width:100%; }
+</style>
+</head>
+<body>
+<h1>Roman Numerals Practice</h1>
+<div class='controls'><button onclick='generate()'>Regenerate</button></div>
+<div id='grid' class='grid'></div>
+<script>
+function toRoman(n){const k=[1000,900,500,400,100,90,50,40,10,9,5,4,1],r=["M","CM","D","CD","C","XC","L","XL","X","IX","V","IV","I"];let s='';for(let i=0;i<k.length;i++){while(n>=k[i]){s+=r[i];n-=k[i];}}return s;}
+
+function weightedPick(){
+  const roll=Math.random();
+  if(roll<0.5) return Math.floor(Math.random()*50)+1;
+  if(roll<0.9) return Math.floor(Math.random()*2030)+1;
+  return Math.floor(Math.random()*3999)+1;
+}
+
+function generate(){
+  const g=document.getElementById('grid'); g.innerHTML='';
+  for(let i=0;i<8;i++){
+    let n=weightedPick();
+    let r=toRoman(n);
+    let d=document.createElement('div'); d.className='card';
+    d.innerHTML=`<div class='roman'>${r}</div>
+      <button class='reveal-btn' onclick='this.nextElementSibling.style.display="block"'>Reveal</button>
+      <div class='answer'>${n}</div>`;
+    g.appendChild(d);
+  }
+}
+
+generate();
+</script>
+</body></html>

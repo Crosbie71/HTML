@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Spoken Language Features – Matching Exercise</title>
+<style>
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
+#left {
+    width: 60%;
+    padding: 20px;
+    background: #f5f5f5;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+#definition-box {
+    flex: 1;
+    background: white;
+    border: 3px solid #ccc;
+    border-radius: 14px;
+    padding: 60px 70px;
+    font-size: 2.8em;
+    line-height: 1.6;
+    overflow-y: auto;
+    margin-bottom: 20px;
+    cursor: pointer;
+    transition: opacity 0.4s ease;
+}
+#feedback {
+    height: 40px;
+    margin-top: 10px;
+    font-size: 1.8em;
+    font-weight: bold;
+}
+#skip-btn, #reset-btn {
+    padding: 14px 20px;
+    font-size: 1.4em;
+    margin-right: 10px;
+    cursor: pointer;
+}
+#right {
+    width: 40%;
+    border-left: 3px solid #ddd;
+    padding: 20px;
+    overflow-y: auto;
+}
+.term-btn {
+    padding: 16px;
+    margin: 10px 0;
+    width: 100%;
+    font-size: 1.4em;
+    cursor: pointer;
+    background: #eaf0ff;
+    border: 2px solid #6b8cff;
+    border-radius: 8px;
+    text-align: left;
+    transition: background-color 0.3s ease;
+}
+.term-btn:hover { background: #dce6ff; }
+.matched { background: #d4ffd4 !important; border-color: #22aa22 !important; }
+
+/* animations */
+@keyframes shake {
+  0%, 100% { transform: translateX(0);}
+  20% { transform: translateX(-10px);}
+  40% { transform: translateX(10px);}
+  60% { transform: translateX(-7px);}
+  80% { transform: translateX(7px);}
+}
+.shake { animation: shake 0.3s; }
+.flash-red { background-color: #ffb3b3 !important; }
+.fade { opacity: 0; }
+</style>
+</head>
+
+<body>
+
+<div id="left">
+    <div id="definition-box">Click a term or begin…</div>
+    <div id="feedback"></div>
+    <div>
+        <button id="skip-btn">Skip</button>
+        <button id="reset-btn">Reset</button>
+    </div>
+</div>
+
+<div id="right">
+    <h2 style="font-size:2em;">Terms</h2>
+    <div id="options"></div>
+</div>
+
+<script>
+/* DEFINITIONS (your updated list) */
+const terms = [
+{term:"Accent", def:"The ways in which words are pronounced. This can vary according to the region or social class of a speaker."},
+{term:"Adjacency pairs", def:"Parallel expressions used across the boundaries of individual speaking turns. They are usually ritualistic and formulaic socially. For example: ‘How are you?’/ ’Fine thanks’"},
+{term:"Back-channel", def:"Words, phrases and non-verbal utterances [e.g. ‘I see’, ‘oh’, ‘uh huh’, ‘really’] used by a listener to give feedback to a speaker that the message is being followed and understood"},
+{term:"Contraction", def:"A reduced form often marked by an apostrophe in writing – e.g. can’t = cannot; she’ll = she will. See also ELISION"},
+{term:"Deixis / deictics", def:"Words such as ‘this’, ‘that’, ‘here’, ‘there’ which refer backwards or forwards or outside a text – a sort of verbal pointing. Very much a context dependent feature of talk."},
+{term:"Dialect", def:"The distinctive grammar and vocabulary which is associated with a regional or social use of a language."},
+{term:"Discourse marker", def:"Words and phrases which are used to signal the relationship and connections between utterances and to signpost that what is said can be followed by the listener or reader. E.g. ‘first’, ‘on the other hand’, ‘now’, ‘what’s more’, ‘so anyway’, etc."},
+{term:"Elision", def:"The omission or slurring [eliding] of one or more sounds or syllables – e.g. gonna = going to; wannabe = want to be; wassup = what is up"},
+{term:"Ellipsis", def:"The omission of part of a grammatical structure. For example, in the dialogue: “You going to the party?” / “Might be.” – the verb ‘are’ and the pronoun ‘I’ are missed out. The resulting ellipsis conveys a more casual and informal tone."},
+{term:"False start", def:"This is when the speaker begins an utterance, then stops and either repeats or reformulates it. Sometimes called self-correction. See also REPAIRS"},
+{term:"Filler", def:"Items which do not carry conventional meaning but which are inserted in speech to allow time to think, to create a pause or to hold a turn in conversation. Examples are ‘er’, ‘um’, ‘ah’. Also called voiced pause."},
+{term:"Grice’s Maxims", def:"Four basic conversational ‘rules’ [maxims] as criteria for successful conversation: quantity [don’t say too much or too little]; relevance [keep to the point]; manner [speak in a clear, coherent and orderly way]; quality [be truthful]"},
+{term:"Hedge", def:"Words and phrases which soften or weaken the force with which something is said – e.g. ‘perhaps’, ‘maybe’, ‘sort of’, ‘possibly’, ‘I think’."},
+{term:"Idiolect", def:"An individually distinctive style of speaking"},
+{term:"Interactional talk", def:"Language in conversation used for interpersonal reasons and/or socialising"},
+{term:"Non-fluency features", def:"Typical and normal characteristics of spoken language that interrupt the ‘flow’ of talk. Some examples: hesitations, false starts, fillers, repetitions [though can be used for emphasis], overlaps and interruptions."},
+{term:"Paralinguistic features", def:"Related to body language – the use of gestures, facial expressions + other non-verbal elements [such as laughter] to add meaning to the speakers message beyond the words being spoken"},
+{term:"Phatic talk", def:"Conversational utterances that have no concrete purpose other than to establish or maintain personal relationships. It’s related to small talk – and follows traditional patterns, with stock responses and formulaic expressions: ‘How are you?’ / ‘Fine’; ‘Cold, isn’t it?’ / ‘Freezing’"},
+{term:"Pragmatics", def:"An approach to discourse analysis which focuses less on structures and more on contexts and purposes of people talking to each other. Crystal: ‘The factors that govern our choice of language in social interaction and the effects of our choice on others.’"},
+{term:"Prosodic features", def:"Includes features such as stress, rhythm, pitch, tempo and intonation – which are used by speakers to mark out key meanings in a message. Essentially, how something is said."},
+{term:"Repairs", def:"An alteration that is suggested or made by a speaker, the addressee, or audience in order to correct or clarify a previous conversational contribution."},
+{term:"Sociolect", def:"A social dialect or variety of speech used by a particular group, such as working-class or upper-class speech"},
+{term:"Tag question", def:"Strings of words normally added to a declarative sentence to turn the statement into a question. E.g. “It’s a bit expensive round here, isn’t it?”"},
+{term:"Transactional talk", def:"Language to get things done or to transmit content or information [used when the participants are exchanging goods and/or services]"},
+{term:"Turn taking", def:"A turn is a time during which a single participant speaks, within a typical, orderly arrangement in which participants speak with minimal overlap and gap between them. The principal unit of description in conversational structure."},
+{term:"Utterance", def:"A complete unit of talk, bounded by the speaker's silence."},
+{term:"Vague language", def:"Statements that sound imprecise and unassertive. E.g. – ‘and so on’, ‘or whatever’, ‘thingummy’, ‘whatsit’"}
+];
+
+/* --- GLOBAL STATE --- */
+let locked = false;
+let remaining = [...terms.keys()].sort(() => Math.random() - 0.5);
+let currentIndex = null;
+
+const box = document.getElementById("definition-box");
+const feedback = document.getElementById("feedback");
+
+/* Build term list (alphabetical) */
+const optionsDiv = document.getElementById("options");
+terms.forEach((obj, i) => {
+    const b = document.createElement("button");
+    b.className = "term-btn";
+    b.id = "term-" + i;
+    b.innerText = obj.term;
+    b.onclick = () => onTermClick(i);
+    optionsDiv.appendChild(b);
+});
+
+/* Load next definition */
+function loadNextDefinition() {
+    if (remaining.length === 0) {
+        box.innerText = "🎉 All done!";
+        document.getElementById("skip-btn").style.display = "none";
+        return;
+    }
+
+    locked = true;
+    currentIndex = remaining[0];
+
+    box.classList.add("fade");
+    setTimeout(() => {
+        showDefinition(currentIndex);
+        box.classList.remove("fade");
+        locked = false;
+    }, 400);
+
+    feedback.innerText = "";
+}
+
+function showDefinition(i) {
+    box.innerText = terms[i].def;
+}
+
+/* MAIN LOGIC: clicking a term */
+function onTermClick(i) {
+    if (locked) return;
+
+    const btn = document.getElementById("term-" + i);
+
+    /* FIX: definition mismatch check */
+    if (
+        !btn.classList.contains("matched") &&
+        terms[i].def !== box.innerText
+    ) {
+        feedback.style.color = "red";
+        feedback.innerText = "Try again!";
+        btn.classList.add("shake", "flash-red");
+        setTimeout(() => btn.classList.remove("shake", "flash-red"), 300);
+        return;
+    }
+
+    /* clicking matched term = review */
+    if (btn.classList.contains("matched")) {
+        showDefinition(i);
+        return;
+    }
+
+    /* correct click */
+    if (i === currentIndex) {
+        feedback.style.color = "green";
+        feedback.innerText = "Correct!";
+        btn.classList.add("matched");
+
+        remaining = remaining.filter(x => x !== i);
+        remaining = [...new Set(remaining)];
+
+        locked = true;
+        setTimeout(() => {
+            locked = false;
+            loadNextDefinition();
+        }, 350);
+
+    } else {
+        feedback.style.color = "red";
+        feedback.innerText = "Try again!";
+        btn.classList.add("shake", "flash-red");
+        setTimeout(() => btn.classList.remove("shake", "flash-red"), 300);
+    }
+}
+
+/* Skip = rotate current definition */
+document.getElementById("skip-btn").onclick = () => skipCurrent();
+box.onclick = () => skipCurrent();
+
+function skipCurrent() {
+    if (locked) return;
+
+    locked = true;
+    box.classList.add("fade");
+
+    remaining = remaining.filter(x => x !== currentIndex);
+    remaining.push(currentIndex);
+    remaining = [...new Set(remaining)];
+
+    setTimeout(() => {
+        box.classList.remove("fade");
+        locked = false;
+        loadNextDefinition();
+    }, 400);
+}
+
+/* Reset */
+document.getElementById("reset-btn").onclick = () => {
+    if (locked) return;
+
+    terms.forEach((t, i) => {
+        document.getElementById("term-" + i).classList.remove("matched");
+    });
+
+    remaining = [...terms.keys()].sort(() => Math.random() - 0.5);
+
+    feedback.innerText = "";
+    locked = false;
+    loadNextDefinition();
+};
+
+/* Start */
+loadNextDefinition();
+</script>
+
+</body>
+</html>

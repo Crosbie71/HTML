@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tense & Aspect Matching</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 40px; 
+            background-color: #f4f7f6; 
+            font-size: 1.3rem; /* Large font size for readability */
+        }
+        
+        h2 { text-align: center; color: #2c3e50; margin-bottom: 30px; }
+
+        /* Table Styling */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            background: white;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            margin-bottom: 40px;
+        }
+
+        th, td {
+            border: 2px solid #bdc3c7;
+            padding: 20px;
+            text-align: center;
+            vertical-align: top;
+        }
+
+        th { 
+            background-color: #ecf0f1; 
+            color: #34495e;
+            font-weight: bold;
+        }
+        
+        .row-header { 
+            background-color: #ecf0f1; 
+            font-weight: bold;
+            width: 180px;
+            color: #2c3e50;
+        }
+
+        .drop-zone {
+            min-height: 130px;
+            background-color: #fafafa;
+            transition: background-color 0.2s;
+        }
+
+        /* Slip Tray Styling */
+        #slip-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            padding: 30px;
+            background: #fff;
+            border: 3px dashed #ccc;
+            border-radius: 8px;
+            min-height: 180px;
+            justify-content: center;
+        }
+
+        /* The Slips (Example Sentences) */
+        .slip {
+            padding: 12px 18px;
+            background: #e1f5fe; /* Soft blue color returned */
+            border: 1px solid #01579b;
+            border-radius: 6px;
+            cursor: move;
+            font-size: 1.15rem;
+            user-select: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        /* Feedback States */
+        .correct { border: 3px solid #27ae60 !important; background-color: #e8f5e9 !important; color: #1b5e20; }
+        .incorrect { border: 3px solid #e74c3c !important; background-color: #fdedec !important; color: #b71c1c; }
+
+        .controls {
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        button {
+            padding: 15px 40px;
+            font-size: 1.3rem;
+            font-weight: bold;
+            background-color: #2980b9;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        button:hover { background-color: #3498db; }
+    </style>
+</head>
+<body>
+
+    <h2>Tense and Aspect Matching</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Tense and Aspect</th>
+                <th>Past</th>
+                <th>Present</th>
+                <th>Future</th>
+            </tr>
+        </thead>
+        <tbody id="table-body">
+            </tbody>
+    </table>
+
+    <div class="controls">
+        <button onclick="checkAnswers()">Check Answers</button>
+    </div>
+
+    <div id="slip-container" ondrop="drop(event)" ondragover="allowDrop(event)">
+        </div>
+
+    <script>
+        // Content strictly from the source 
+        const data = [
+            { aspect: "Simple", past: ["I went home.", "She talked to me."], present: ["The bus comes at 3.", "I drive to work."], future: ["I’ll have the fish.", "This will not take long."] },
+            { aspect: "Progressive", past: ["They were looking for her.", "It wasn’t going well."], present: ["He’s asking for help.", "I’m living with my folks."], future: ["She’ll be working all night.", "It will be taking place at 2."] },
+            { aspect: "Perfect", past: ["We hadn’t split up by then.", "I had readied everything."], present: ["You’ve eaten breakfast.", "The wall has collapsed."], future: ["You’ll have finished by 1.", "We will have beaten it."] },
+            { aspect: "Perfect Continuous", past: ["I’d been taking my time.", "Mm, she’d been asking."], present: ["I’ve been thinking about it.", "That’s been bugging me."], future: ["I’ll have been doing it for ages.", "We won’t have been running all day, then."] }
+        ];
+
+        const tableBody = document.getElementById('table-body');
+        const slipContainer = document.getElementById('slip-container');
+        let allSlips = [];
+
+        // Build Table Structure
+        data.forEach(row => {
+            const tr = document.createElement('tr');
+            const th = document.createElement('td');
+            th.className = 'row-header';
+            th.innerText = row.aspect;
+            tr.appendChild(th);
+
+            ['past', 'present', 'future'].forEach(tense => {
+                const td = document.createElement('td');
+                td.className = 'drop-zone';
+                td.dataset.aspect = row.aspect;
+                td.dataset.tense = tense;
+                td.ondrop = drop;
+                td.ondragover = allowDrop;
+                tr.appendChild(td);
+
+                row[tense].forEach(text => {
+                    allSlips.push({ text, aspect: row.aspect, tense: tense });
+                });
+            });
+            tableBody.appendChild(tr);
+        });
+
+        // Shuffle and Build the Slips 
+        allSlips.sort(() => Math.random() - 0.5);
+        allSlips.forEach((item, index) => {
+            const div = document.createElement('div');
+            div.className = 'slip';
+            div.innerText = item.text;
+            div.draggable = true;
+            div.id = 'slip-' + index;
+            div.dataset.correctAspect = item.aspect;
+            div.dataset.correctTense = item.tense;
+            div.ondragstart = drag;
+            slipContainer.appendChild(div);
+        });
+
+        function allowDrop(ev) { ev.preventDefault(); }
+        function drag(ev) { ev.dataTransfer.setData("text", ev.target.id); }
+
+        function drop(ev) {
+            ev.preventDefault();
+            const dataId = ev.dataTransfer.getData("text");
+            const slip = document.getElementById(dataId);
+            let target = ev.target;
+            
+            // Allow dropping onto TD even if another slip is already inside
+            while (target && !target.classList.contains('drop-zone') && target.id !== 'slip-container') {
+                target = target.parentNode;
+            }
+            
+            if (target) {
+                target.appendChild(slip);
+                slip.classList.remove('correct', 'incorrect');
+            }
+        }
+
+        function checkAnswers() {
+            document.querySelectorAll('.slip').forEach(slip => {
+                const parent = slip.parentNode;
+                if (parent.id === 'slip-container') {
+                    slip.classList.remove('correct', 'incorrect');
+                    return;
+                }
+                const isCorrect = parent.dataset.aspect === slip.dataset.correctAspect && 
+                                  parent.dataset.tense === slip.dataset.correctTense;
+                slip.classList.add(isCorrect ? 'correct' : 'incorrect');
+                slip.classList.remove(isCorrect ? 'incorrect' : 'correct');
+            });
+        }
+    </script>
+</body>
+</html>

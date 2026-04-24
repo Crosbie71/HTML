@@ -1,0 +1,99 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"> 
+<meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+<title>My Lesson Portal</title><style> 
+body { font-family: sans-serif; background: #f0f2f5; padding: 20px; text-align: center; } 
+.toolbar { display: flex; gap: 10px; align-items: center; max-width: 1200px; margin: 0 auto 24px; flex-wrap: wrap; } 
+#search { flex: 1; min-width: 180px; padding: 9px 14px; font-size: 0.95em; border: 2px solid #ddd; border-radius: 6px; outline: none; transition: border-color 0.15s; } 
+#search:focus { border-color: #3498db; } 
+.sort-btns { display: flex; gap: 6px; } 
+.sort-btns button { font-family: inherit; font-size: 0.8em; padding: 7px 13px; border: 2px solid #ddd; border-radius: 6px; background: white; cursor: pointer; transition: 0.15s; color: #555; } 
+.sort-btns button:hover { border-color: #3498db; color: #3498db; } 
+.sort-btns button.active { border-color: #3498db; background: #3498db; color: white; } 
+#count { font-size: 0.8em; color: #999; white-space: nowrap; } 
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; max-width: 1200px; margin: 0 auto; } 
+.card { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); text-decoration: none; color: #333; border-top: 4px solid #3498db; transition: 0.2s; display: flex; flex-direction: column; justify-content: space-between; min-height: 100px; text-align: left; } 
+.card:hover { transform: translateY(-5px); border-top-color: #2ecc71; box-shadow: 0 5px 15px rgba(0,0,0,0.1); } 
+.card h3 { margin: 0; font-size: 1.1em; word-break: break-word; } 
+.card p { font-size: 0.75em; color: #aaa; margin-top: 10px; } 
+.card .date { font-size: 0.7em; color: #bbb; margin-top: 6px; } 
+mark { background: #fff3cd; border-radius: 2px; } 
+#empty { display: none; color: #aaa; font-size: 0.95em; margin-top: 40px; } 
+</style></head><body> 
+<h1>My Lesson Portal</h1> 
+<div class="toolbar"> 
+<input type="text" id="search" placeholder="Search files..." oninput="render()" autofocus> 
+<div class="sort-btns"> 
+<button id="btn-name" onclick="setSort('name')">A-Z</button> 
+<button id="btn-date" onclick="setSort('date')">Recent first</button> 
+</div><span id="count"></span></div> 
+<div class="grid" id="grid"></div><p id="empty">No files match your search.</p> 
+<script> 
+const FILE_LIST = [ 
+  { name: "2357RevisionPlannerY1Mocks.html", modified: "22/04/2026 17:00" }, 
+  { name: "AdjacencyPairs.html", modified: "16/03/2026 15:33" }, 
+  { name: "AIPolicyClaude.html", modified: "23/02/2026 12:40" }, 
+  { name: "ALExamRevPlanner.html", modified: "24/04/2026 12:13" }, 
+  { name: "Austen.html", modified: "17/04/2026 10:11" }, 
+  { name: "ChangeRevision.html", modified: "21/04/2026 12:44" }, 
+  { name: "Cohesion.html", modified: "16/04/2026 14:42" }, 
+  { name: "CohesionMatching.html", modified: "16/04/2026 14:35" }, 
+  { name: "CohesionV2.html", modified: "16/04/2026 14:48" }, 
+  { name: "Dataset Size Comparison.html", modified: "22/08/2025 09:25" }, 
+  { name: "deep-time-lewes.html", modified: "02/03/2026 15:37" }, 
+  { name: "DiversityRevision.html", modified: "27/02/2026 10:45" }, 
+  { name: "GenderedJobs.html", modified: "09/02/2026 15:08" }, 
+  { name: "GenderedJobsGemini.html", modified: "09/02/2026 15:17" }, 
+  { name: "icebreakers_random_question_deck_fixed.html", modified: "14/01/2026 16:13" }, 
+  { name: "InteractionDiagram.html", modified: "23/02/2026 12:41" }, 
+  { name: "Passives.html", modified: "24/02/2026 13:18" }, 
+  { name: "PhonemicRevision.html", modified: "17/02/2026 11:51" }, 
+  { name: "Reader.html", modified: "10/02/2026 11:39" }, 
+  { name: "roman-numerals-weighted-reveal.html", modified: "10/03/2026 16:08" }, 
+  { name: "Scheduler.html", modified: "23/04/2026 18:14" }, 
+  { name: "SchedulerMVP.html", modified: "21/04/2026 18:01" }, 
+  { name: "SimpleCompoundComplexMinor.html", modified: "12/02/2026 09:49" }, 
+  { name: "slang_quiz_offline_auto.html", modified: "02/02/2026 17:43" }, 
+  { name: "SpokLang.html", modified: "24/03/2026 13:30" }, 
+  { name: "StudentFinance.html", modified: "16/01/2026 17:09" }, 
+  { name: "TannenMatching.html", modified: "10/02/2026 16:47" }, 
+  { name: "TensesMatching.html", modified: "20/01/2026 11:31" }, 
+  { name: "Verb Forms test app.html", modified: "26/06/2025 09:03" }, 
+  { name: "VerbPrepositionGenerator.html", modified: "08/12/2025 15:22" }, 
+  { name: "GenresFlashcards.htm", modified: "07/10/2025 12:40" }, 
+  { name: "PaperSlips.htm", modified: "18/12/2025 13:35" }, 
+]; 
+let sortMode = 'name'; 
+function setSort(mode) { sortMode = mode; document.getElementById('btn-name').classList.toggle('active', mode === 'name'); document.getElementById('btn-date').classList.toggle('active', mode === 'date'); render(); } 
+function parseDate(s) { const m = s.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/); return m ? new Date(m[3], m[2]-1, m[1], m[4], m[5]) : new Date(0); } 
+function render() { 
+  const q = document.getElementById('search').value.trim().toLowerCase(); 
+  const grid = document.getElementById('grid'); 
+  const empty = document.getElementById('empty'); 
+  const count = document.getElementById('count'); 
+  let files = [...FILE_LIST]; 
+  if (sortMode === 'name') files.sort((a,b) => a.name.localeCompare(b.name)); 
+  else files.sort((a,b) => parseDate(b.modified) - parseDate(a.modified)); 
+  const filtered = q ? files.filter(f => f.name.toLowerCase().includes(q)) : files; 
+  grid.innerHTML = ''; 
+  if (!filtered.length) { empty.style.display='block'; count.textContent=''; return; } 
+  empty.style.display = 'none'; 
+  count.textContent = filtered.length + ' of ' + files.length; 
+  filtered.forEach(f => { 
+    const a = document.createElement('a'); a.className='card'; a.href=f.name; 
+    const display = f.name.replace(/\.(html?)$/i, ''); 
+    const h = document.createElement('h3'); 
+    const idx = q ? display.toLowerCase().indexOf(q) : -1; 
+    if (idx >= 0) { 
+      const pre = document.createTextNode(display.slice(0,idx)); 
+      const mid = document.createElement('mark'); mid.textContent = display.slice(idx,idx+q.length); 
+      const post = document.createTextNode(display.slice(idx+q.length)); 
+      h.appendChild(pre); h.appendChild(mid); h.appendChild(post); 
+    } else { h.textContent = display; } 
+    const p = document.createElement('p'); p.textContent = 'Click to open'; 
+    a.appendChild(h); a.appendChild(p); 
+    if (f.modified) { const d=document.createElement('div'); d.className='date'; d.textContent=f.modified; a.appendChild(d); } 
+    grid.appendChild(a); 
+  }); 
+} 
+setSort('name'); 
+</script></body></html> 

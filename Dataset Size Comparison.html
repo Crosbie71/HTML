@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dataset Size Comparison</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter font from Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Basic styling for the body */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #000; /* Black background as in mockup */
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden; /* Prevent scrollbars */
+        }
+        /* Canvas styling */
+        canvas {
+            background-color: #000; /* Canvas background matches body */
+            display: block;
+            border-radius: 1rem; /* Rounded corners for the canvas */
+            max-width: 95vw; /* Responsive width: 95% of viewport width */
+            max-height: 70vh; /* Responsive height: 70% of viewport height */
+            margin-bottom: 1rem;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5); /* Subtle shadow */
+        }
+        /* Controls container styling */
+        .controls {
+            display: flex;
+            gap: 1rem; /* Space between buttons */
+            margin-top: 1rem;
+        }
+        /* Button base styling */
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: background-color 0.2s, transform 0.1s; /* Smooth transitions for hover/active */
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Subtle button shadow */
+        }
+        /* Primary button styling */
+        .btn-primary {
+            background-color: #6366F1; /* Tailwind Indigo-500 */
+            color: white;
+        }
+        /* Primary button hover effect */
+        .btn-primary:hover {
+            background-color: #4F46E5; /* Tailwind Indigo-600 */
+            transform: translateY(-1px); /* Slight lift effect */
+        }
+        /* Primary button active effect */
+        .btn-primary:active {
+            background-color: #4338CA; /* Tailwind Indigo-700 */
+            transform: translateY(0); /* Return to original position */
+        }
+        /* Disabled button styling */
+        .btn-disabled {
+            background-color: #4B5563; /* Tailwind Gray-600 */
+            color: #9CA3AF; /* Tailwind Gray-400 */
+            cursor: not-allowed; /* Indicate non-interactiveness */
+        }
+    </style>
+</head>
+<body>
+    <!-- Main title of the animation -->
+    <h1 class="text-3xl font-bold mb-6 text-center">Text Dataset Size Comparison</h1>
+    <!-- Canvas element for drawing the animation -->
+    <canvas id="datasetCanvas"></canvas>
+    <!-- Navigation controls -->
+    <div class="controls">
+        <button id="prevBtn" class="btn btn-primary">Previous</button>
+        <button id="nextBtn" class="btn btn-primary">Next</button>
+    </div>
+
+    <script>
+        // Get canvas and button elements
+        const canvas = document.getElementById('datasetCanvas');
+        const ctx = canvas.getContext('2d');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+
+        // Define dataset information: name, approximate word count, and color
+        const datasets = [
+            { name: 'Lord of the Rings', words: 481000, color: '#FFD700' }, // Gold
+            { name: 'Harry Potter Series', words: 1084000, color: '#FFA500' }, // Orange
+            { name: 'British National Corpus (BNC)', words: 100000000, color: '#FF6347' }, // Tomato
+            { name: 'One-Billion-Word Dataset', words: 1000000000, color: '#DC143C' }, // Crimson
+            { name: 'Google Books (approx)', words: 3000000000000, color: '#8B0000' }, // DarkRed
+            { name: 'Large Language Model Dataset (approx)', words: 1000000000000000, color: '#4B0082' } // Indigo
+        ];
+
+        let currentIndex = 0; // Current dataset being focused
+        let targetOffsetX = 0; // Target X offset for smooth animation
+        let currentOffsetX = 0; // Current X offset during animation
+        let targetGlobalScale = 1; // Target global scaling factor
+        let currentGlobalScale = 1; // Current global scaling factor during animation
+        const animationSpeed = 0.05; // Controls the speed of the smooth transition (0 to 1)
+
+        // --- Scaling Logic ---
+        // Base side length for the smallest dataset (Lord of the Rings) in pixels
+        // This is used to calculate the *unscaled* side of each dataset.
+        const baseSideLOTR = 150; 
+        // Calculate the area per word unit based on LOTR. This ensures area is proportional to word count.
+        const areaPerWord = (baseSideLOTR * baseSideLOTR) / datasets[0].words; // pixels^2 per word
+
+        // Pre-calculate unscaled dimensions and ratios for all datasets
+        datasets.forEach((dataset, i) => {
+            // Ratio to the previous dataset for comparison text
+            dataset.ratioToPrev = i === 0 ? 1 : dataset.words / datasets[i - 1].words;
+            // Ratio to the Lord of the Rings dataset for overall comparison
+            dataset.ratioToLOTR = dataset.words / datasets[0].words;
+
+            // Calculate the required area for the dataset
+            const area = dataset.words * areaPerWord;
+            // Calculate the side length of the square based on its area
+            dataset.unscaledSide = Math.sqrt(area); // Store the unscaled side
+        });
+
+        let maxDisplaySide; // Maximum side length a rectangle can have on screen
+        // Increased padding to allow more space for labels below the rectangles
+        const rectBottomPadding = 150; 
+
+        // Function to update canvas size and related dimensions
+        function resizeCanvas() {
+            // Set canvas dimensions based on a percentage of window size for responsiveness
+            canvas.width = window.innerWidth * 0.95; 
+            canvas.height = window.innerHeight * 0.7; 
+
+            // Determine the maximum side length for display, considering padding
+            maxDisplaySide = Math.min(canvas.width * 0.8, canvas.height * 0.8 - rectBottomPadding); 
+            
+            // Recalculate scale and update offset based on new canvas size
+            calculateTargetScale();
+            updateTargetOffset();
+            
+            // Snap current offset and scale to target immediately on resize to prevent jumpiness
+            currentOffsetX = targetOffsetX; 
+            currentGlobalScale = targetGlobalScale;
+            draw(); // Redraw canvas content after resizing
+        }
+
+        // Initialize canvas size on page load
+        resizeCanvas();
+        // Add event listener for window resize to make the canvas responsive
+        window.addEventListener('resize', resizeCanvas);
+
+        // Function to format large numbers into more readable strings (e.g., million, billion)
+        function formatNumber(num) {
+            if (num >= 1e15) return (num / 1e15).toFixed(1) + ' quadrillion';
+            if (num >= 1e12) return (num / 1e12).toFixed(1) + ' trillion';
+            if (num >= 1e9) return (num / 1e9).toFixed(1) + ' billion';
+            if (num >= 1e6) return (num / 1e6).toFixed(1) + ' million';
+            return num.toLocaleString(); // Use locale-specific formatting for smaller numbers
+        }
+
+        // Function to calculate the target global scaling factor
+        function calculateTargetScale() {
+            let largestUnscaledSideInCurrentView = 0;
+            // Find the largest unscaled side among visible datasets (from index 0 to currentIndex)
+            for (let i = 0; i <= currentIndex; i++) {
+                if (datasets[i].unscaledSide > largestUnscaledSideInCurrentView) {
+                    largestUnscaledSideInCurrentView = datasets[i].unscaledSide;
+                }
+            }
+
+            // If the largest unscaled side is greater than maxDisplaySide, calculate scale to shrink
+            // Otherwise, no shrinking is needed, keep scale at 1
+            if (largestUnscaledSideInCurrentView > maxDisplaySide) {
+                targetGlobalScale = maxDisplaySide / largestUnscaledSideInCurrentView;
+            } else {
+                targetGlobalScale = 1;
+            }
+        }
+
+        // Function to draw all rectangles and text on the canvas
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear the entire canvas
+
+            let currentDrawingX = currentOffsetX; // This variable will track the X position for drawing each rectangle
+
+            // Loop through all datasets to draw them
+            for (let i = 0; i < datasets.length; i++) {
+                const dataset = datasets[i];
+                // Use the unscaled side and apply the current animated global scale
+                let side = dataset.unscaledSide * currentGlobalScale;
+                // Ensure a minimum visible size for the rectangle (at least 1 pixel)
+                side = Math.max(1, side); 
+                
+                // Rectangle dimensions (squares, so width and height are equal to side)
+                const rectWidth = side;
+                const rectHeight = side;
+
+                // Calculate rectangle Y position to align bottoms of all rectangles
+                const rectY = canvas.height - rectBottomPadding - rectHeight;
+
+                // Only draw if the rectangle is potentially visible within the canvas bounds
+                if (currentDrawingX + rectWidth > 0 && currentDrawingX < canvas.width && rectY < canvas.height) {
+                    // Draw the rectangle background
+                    ctx.fillStyle = dataset.color;
+                    ctx.fillRect(currentDrawingX, rectY, rectWidth, rectHeight);
+                    // Draw a white border around the rectangle
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(currentDrawingX, rectY, rectWidth, rectHeight);
+
+                    // --- Label Drawing Logic ---
+                    const minRectSizeForLabels = 30; // If rectangle is smaller than this, no labels.
+                    const minFontSizePx = 8; // Minimum font size in pixels.
+                    const maxFontSizePxName = 24; // Maximum font size for name (e.g., 1.5rem * 16px)
+                    const maxFontSizePxWords = 18; // Maximum font size for words (e.g., 1.125rem * 16px)
+                    const maxFontSizePxComparison = 18; // Maximum font size for comparison (e.g., 1.125rem * 16px)
+
+
+                    if (rectWidth >= minRectSizeForLabels) {
+                        ctx.fillStyle = '#fff';
+                        ctx.textAlign = 'center';
+
+                        // Calculate font sizes based on the displayed size of the current rectangle
+                        // This ensures labels scale with their OWN rectangle, not just globally.
+                        const labelScaleFactor = side / baseSideLOTR; 
+                        const baseFontSizePxName = 1.2 * 16; // Convert rem to px
+                        const baseFontSizePxWords = 1.0 * 16;
+                        const baseFontSizePxComparison = 1.0 * 16;
+
+                        const scaledFontSizeName = Math.min(maxFontSizePxName, Math.max(minFontSizePx, baseFontSizePxName * labelScaleFactor)); 
+                        const scaledFontSizeWords = Math.min(maxFontSizePxWords, Math.max(minFontSizePx, baseFontSizePxWords * labelScaleFactor));
+                        const scaledFontSizeComparison = Math.min(maxFontSizePxComparison, Math.max(minFontSizePx, baseFontSizePxComparison * labelScaleFactor));
+
+                        // Approximate line heights in pixels
+                        const lineHeightName = scaledFontSizeName * 1.2; // Adjusted for tighter spacing
+                        const lineHeightWords = scaledFontSizeWords * 1.2;
+                        const lineHeightComparison = scaledFontSizeComparison * 1.2;
+                        const totalTextHeight = lineHeightName + lineHeightWords + lineHeightComparison;
+
+                        let textY;
+                        let textBaseline;
+
+                        // Try to place labels below the rectangle
+                        // Check if there's enough space below the rectangle for all labels + a small margin (10px)
+                        if (rectY + rectHeight + 10 + totalTextHeight < canvas.height - 10) { 
+                            textY = rectY + rectHeight + 10;
+                            textBaseline = 'top';
+                        } else if (rectY - totalTextHeight - 10 > 0) { // Else, try to place above if there's space
+                            textY = rectY - totalTextHeight - 10;
+                            textBaseline = 'top'; 
+                        } else {
+                            // Fallback: place below, might overlap but it's the only option if space is very limited
+                            textY = rectY + rectHeight + 10;
+                            textBaseline = 'top';
+                        }
+                        ctx.textBaseline = textBaseline;
+
+                        // Draw Dataset Name
+                        ctx.font = `bold ${scaledFontSizeName}px Inter`;
+                        ctx.fillText(dataset.name, currentDrawingX + rectWidth / 2, textY);
+
+                        // Draw Word Count
+                        ctx.font = `${scaledFontSizeWords}px Inter`;
+                        ctx.fillText(`${formatNumber(dataset.words)} words`, currentDrawingX + rectWidth / 2, textY + lineHeightName);
+
+                        // Draw Comparison Text (e.g., "2.3x previous", "1000x LOTR")
+                        let comparisonText = '';
+                        if (i === 0) {
+                            comparisonText = 'Base Dataset';
+                        } else {
+                            // Format ratio to previous, adding 'k' for thousands if needed
+                            const ratioToPrevFormatted = dataset.ratioToPrev >= 1000 ? (dataset.ratioToPrev / 1000).toFixed(1) + 'k' : dataset.ratioToPrev.toFixed(1);
+                            comparisonText = `${ratioToPrevFormatted}x previous`;
+                            // For very large datasets, also compare to the initial Lord of the Rings dataset
+                            if (dataset.ratioToLOTR > 10) { 
+                                const ratioToLOTRFormatted = dataset.ratioToLOTR >= 1000 ? (dataset.ratioToLOTR / 1000).toFixed(1) + 'k' : dataset.ratioToLOTR.toFixed(1);
+                                comparisonText += ` (${ratioToLOTRFormatted}x LOTR)`;
+                            }
+                        }
+                        ctx.fillText(comparisonText, currentDrawingX + rectWidth / 2, textY + lineHeightName + lineHeightWords);
+                    }
+                }
+
+                // Update X position for the next rectangle, adding padding
+                currentDrawingX += rectWidth + 30; // 30px padding between rectangles
+            }
+        }
+
+        // Animation loop for smooth transitions
+        function animate() {
+            // Interpolate currentOffsetX towards targetOffsetX
+            currentOffsetX += (targetOffsetX - currentOffsetX) * animationSpeed;
+            // Interpolate currentGlobalScale towards targetGlobalScale
+            currentGlobalScale += (targetGlobalScale - currentGlobalScale) * animationSpeed;
+
+            // If very close to the target, snap to it to prevent infinite small movements
+            if (Math.abs(targetOffsetX - currentOffsetX) < 0.1 && Math.abs(targetGlobalScale - currentGlobalScale) < 0.0001) {
+                currentOffsetX = targetOffsetX; 
+                currentGlobalScale = targetGlobalScale;
+            } else {
+                // Continue animation if not yet at target
+                requestAnimationFrame(animate);
+            }
+            draw(); // Redraw the canvas in each animation frame
+        }
+
+        // Function to update the target offset based on the current index
+        function updateTargetOffset() {
+            if (!datasets[currentIndex]) return; // Ensure dataset exists
+
+            calculateTargetScale(); // Calculate the new target global scale
+
+            const currentDataset = datasets[currentIndex];
+            // Use the *scaled* side for positioning calculation (using target scale for calculation)
+            const currentSideForPositioning = Math.max(1, currentDataset.unscaledSide * targetGlobalScale); 
+
+            // Calculate the desired X position for the LEFT edge of the current (focused) rectangle
+            let desiredLeftEdgeOfCurrent = (canvas.width / 2) - (currentSideForPositioning / 2);
+
+            // Calculate the total width of all rectangles *before* the current one, including padding
+            let totalWidthOfPreviousRects = 0;
+            for (let i = 0; i < currentIndex; i++) {
+                const prevDataset = datasets[i];
+                // Ensure previous sides also respect minimum size for positioning accuracy
+                const prevSideForPositioning = Math.max(1, prevDataset.unscaledSide * targetGlobalScale);
+                totalWidthOfPreviousRects += (prevSideForPositioning + 30);
+            }
+
+            // The targetOffsetX is the position where the first rectangle (index 0) should start
+            // to make the current rectangle centered.
+            // It's the desired left edge of the current rectangle MINUS the accumulated width of previous rectangles.
+            targetOffsetX = desiredLeftEdgeOfCurrent - totalWidthOfPreviousRects;
+            
+            animate(); // Start or continue the animation
+        }
+
+        // Event listener for the "Next" button
+        nextBtn.addEventListener('click', () => {
+            if (currentIndex < datasets.length - 1) { // Check if not at the last dataset
+                currentIndex++; // Move to the next dataset
+                updateTargetOffset(); // Update the view
+            }
+        });
+
+        // Event listener for the "Previous" button
+        prevBtn.addEventListener('click', () => {
+            if (currentIndex > 0) { // Check if not at the first dataset
+                currentIndex--; // Move to the previous dataset
+                updateTargetOffset(); // Update the view
+            }
+        });
+
+        // Initial setup: calculate target offset and scale, and start animation
+        updateTargetOffset(); 
+        animate(); 
+    </script>
+</body>
+</html>
+
+

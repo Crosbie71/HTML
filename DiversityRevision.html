@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Theorist Randomizer</title>
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --primary-blue: #2563eb;
+            --accent-orange: #f59e0b;
+            --text-main: #1e293b;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            color: var(--text-main);
+        }
+
+        .container {
+            text-align: center;
+            width: 95%;
+            max-width: 1200px;
+        }
+
+        h1 { font-size: 2.5rem; margin-bottom: 1rem; color: #0f172a; }
+        p.instr { margin-bottom: 2rem; color: #64748b; font-size: 1.1rem; }
+
+        .card-display {
+            display: flex;
+            justify-content: center;
+            gap: 25px;
+            margin-bottom: 3rem;
+            min-height: 350px;
+            flex-wrap: wrap;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 24px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 450px;
+            min-width: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            font-size: 3.5rem;
+            font-weight: 800;
+            text-align: center;
+            border: 6px solid var(--primary-blue);
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            animation: slideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            user-select: none;
+        }
+
+        .card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 25px 30px -5px rgba(0, 0, 0, 0.15);
+            background-color: #f0f7ff;
+        }
+
+        @keyframes slideUp {
+            0% { transform: translateY(30px); opacity: 0; }
+            100% { transform: translateY(0); opacity: 1; }
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 18px 35px;
+            font-size: 1.25rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            border-radius: 12px;
+            background-color: var(--primary-blue);
+            color: white;
+            transition: all 0.2s;
+        }
+
+        button.secondary { background-color: #64748b; }
+        button:hover { filter: brightness(1.1); transform: translateY(-2px); }
+        button:active { transform: translateY(0); }
+
+        .status-area { margin-top: 25px; height: 30px; }
+        .counter { color: #94a3b8; font-weight: 500; }
+        .notify { color: var(--accent-orange); font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Language Diversity Theories</h1>
+        <p class="instr">Click a card to replace it with a new one from the deck.</p>
+        
+        <div class="card-display" id="cardContainer">
+            <div class="card" onclick="draw(1)" style="font-size: 2rem;">Click "Pull" to begin</div>
+        </div>
+
+        <div class="controls">
+            <button onclick="draw(1)">Pull Single Card</button>
+            <button onclick="draw(2)">Pull Pair</button>
+            <button class="secondary" onclick="resetDeck()">Reset Deck</button>
+        </div>
+
+        <div class="status-area">
+            <div id="deckStatus" class="counter"></div>
+            <div id="notification" class="notify"></div>
+        </div>
+    </div>
+
+    <script>
+        const originalTheorists = [
+            "Anna-Brita Stenström", "Basil Bernstein", "Cockney Rhyming Slang",
+            "Deborah Tannen", "Howard Giles", "Jenny Cheshire",
+            "Manchester ‘Our Dialects’", "Pamela Fishman", "David Rosewarne",
+            "Polari", "Robin Lakoff", "William Labov", "Penelope Eckert", "Erving Goffman"
+        ];
+
+        let deck = [...originalTheorists];
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        function notify(msg) {
+            const el = document.getElementById('notification');
+            el.innerText = msg;
+            setTimeout(() => el.innerText = '', 3000);
+        }
+
+        function updateStatus() {
+            document.getElementById('deckStatus').innerText = `Cards remaining: ${deck.length} / ${originalTheorists.length}`;
+        }
+
+        function resetDeck() {
+            deck = [...originalTheorists];
+            shuffle(deck);
+            notify("Deck reshuffled!");
+            updateStatus();
+        }
+
+        function replaceCard(cardElement) {
+            if (deck.length === 0) {
+                resetDeck();
+            }
+            const newName = deck.pop();
+            cardElement.innerText = newName;
+            updateStatus();
+        }
+
+        function draw(count) {
+            const container = document.getElementById('cardContainer');
+            container.innerHTML = '';
+
+            for (let i = 0; i < count; i++) {
+                if (deck.length === 0) {
+                    resetDeck();
+                }
+                const name = deck.pop();
+                const cardDiv = document.createElement('div');
+                cardDiv.className = 'card';
+                cardDiv.innerText = name;
+                cardDiv.onclick = function() { replaceCard(this); };
+                container.appendChild(cardDiv);
+            }
+            updateStatus();
+        }
+
+        // Initial setup
+        shuffle(deck);
+        updateStatus();
+    </script>
+</body>
+</html>
