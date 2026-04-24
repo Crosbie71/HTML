@@ -6,6 +6,18 @@ A collection of interactive, browser-based tools for teaching — primarily A-Le
 
 ---
 
+## What's here
+
+**Language & Linguistics** — interactive exercises covering phonology, grammar, spoken language, cohesion, language change, and diversity. Matching games, drag-and-drop activities, flashcard randomisers, and classroom quizzes, mostly keyed to AQA spec content.
+
+**Exam & Revision Planning** — timetable tools for building personalised revision plans around real exam schedules, with drag-and-drop session management and print-to-PDF output.
+
+**Staff Scheduling** — a constraint-solving rota builder for allocating invigilators across a mock exam week, with availability tracking and CSV export.
+
+**General Tools** — cross-subject utilities including a digital card-sort board, discussion prompt decks, financial literacy resources, and an AI policy discussion mapper.
+
+---
+
 ## Highlights
 
 **[PaperSlips.htm](PaperSlips.htm)** — A freeform digital card-sort board. Type or paste any list of words or phrases and they appear as draggable slips; group, label, and rearrange freely. Import and export CSV to save and restore layouts. Deceptively simple and useful across subjects and activities.
@@ -19,18 +31,6 @@ A collection of interactive, browser-based tools for teaching — primarily A-Le
 **[Scheduler.html](Scheduler.html)** — A constraint-solving rota builder for allocating invigilators across a mock exam week. Staff availability, quotas, and clash detection handled automatically; manual drag-and-drop for tweaks; CSV and Google Sheets export.
 
 **[deep-time-lewes.html](deep-time-lewes.html)** — Geological and evolutionary time scaled onto a walk east from Lewes. The formation of the Earth is roughly as far as Sri Lanka; writing was invented around the corner.
-
----
-
-## What's here
-
-**Language & Linguistics** — interactive exercises covering phonology, grammar, spoken language, cohesion, language change, and diversity. Matching games, drag-and-drop activities, flashcard randomisers, and classroom quizzes, mostly keyed to AQA spec content.
-
-**Exam & Revision Planning** — timetable tools for building personalised revision plans around real exam schedules, with drag-and-drop session management and print-to-PDF output.
-
-**Staff Scheduling** — a constraint-solving rota builder for allocating invigilators across a mock exam week, with availability tracking and CSV export.
-
-**General Tools** — cross-subject utilities including a digital card-sort board, discussion prompt decks, financial literacy resources, and an AI policy discussion mapper.
 
 ---
 
