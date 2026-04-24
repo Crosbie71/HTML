@@ -1,0 +1,32 @@
+name: Update filelist.js
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  update-filelist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate filelist.js
+        run: |
+          echo "const FILE_LIST = [" > filelist.js
+          for f in *.html *.htm; do
+            [ -f "$f" ] || continue
+            [ "$f" = "index.html" ] && continue
+            date=$(git log -1 --format="%ci" -- "$f" | cut -c1-10)
+            echo "  { name: \"$f\", modified: \"$date\" }," >> filelist.js
+          done
+          echo "];" >> filelist.js
+
+      - name: Commit filelist.js
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add filelist.js
+          git diff --staged --quiet || git commit -m "Update filelist.js"
+          git push
