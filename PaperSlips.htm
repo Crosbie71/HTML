@@ -29,6 +29,7 @@
       position: fixed;
       inset: 0 0 var(--toolbar-h) 0; /* top, right, bottom, left */
       overflow: hidden;
+      touch-action: none;
       background:
         linear-gradient(0deg, rgba(0,0,0,0.04) 1px, transparent 1px) 0 0 / 100% var(--grid),
         linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px) 0 0 / var(--grid) 100%,
@@ -55,7 +56,7 @@
       border-radius: 8px;
       font-size: 16px;
     }
-    #addBtn, #importBtn, #exportBtn, #clearBtn {
+    #addBtn, #importBtn, #exportBtn, #clearBtn, #deleteBtn {
       height: 44px;
       padding: 0 14px;
       border: 1px solid #cfd7e4;
@@ -66,7 +67,8 @@
     }
     #addBtn { background: #eaf3ff; border-color: #b7d2ff; }
     #addBtn:hover { background: #dbeaff; }
-    #exportBtn:hover, #importBtn:hover, #clearBtn:hover { background: #eef2f7; }
+    #exportBtn:hover, #importBtn:hover, #clearBtn:hover, #deleteBtn:hover:not(:disabled) { background: #eef2f7; }
+    #deleteBtn:disabled { opacity: 0.4; cursor: default; }
 
     label.small {
       display: inline-flex;
@@ -88,6 +90,7 @@
       padding: 8px 12px;
       box-shadow: 0 1px 0 rgba(0,0,0,0.06), 0 4px 10px rgba(0,0,0,0.06);
       cursor: grab;
+      touch-action: none;
       user-select: none;
       white-space: pre-wrap;
       overflow-wrap: anywhere;
@@ -129,6 +132,7 @@
     <button id="importBtn" title="Import CSV">Import</button>
     <button id="exportBtn" title="Export CSV">Export</button>
     <button id="clearBtn" title="Remove all">Clear</button>
+    <button id="deleteBtn" title="Delete selected cards" disabled>Delete</button>
     <label class="small"><input type="checkbox" id="snap" /> Snap to grid</label>
     <input id="fileInput" type="file" accept=".csv,text/csv" hidden />
   </div>
@@ -144,8 +148,10 @@
       const clearBtn  = document.getElementById('clearBtn');
       const snapChk   = document.getElementById('snap');
       const fileInput = document.getElementById('fileInput');
+      const deleteBtn = document.getElementById('deleteBtn');
 
       const GRID = 24;
+      let lastTap = { card: null, time: 0 };
       let zCounter = 10;
       let dragging = null;            // { anchor, pointerId, members: [...], offsets: [...] }
       let selectedCards = new Set();  // multi-select
@@ -211,21 +217,25 @@
       }
 
       /** Selection utils **/
+      function updateDeleteBtn() { deleteBtn.disabled = selectedCards.size === 0; }
       function clearSelection() {
         selectedCards.forEach(c => c.classList.remove('selected'));
         selectedCards.clear();
+        updateDeleteBtn();
       }
       function addToSelection(card) {
         if (!selectedCards.has(card)) {
           selectedCards.add(card);
           card.classList.add('selected');
           card.style.zIndex = ++zCounter;
+          updateDeleteBtn();
         }
       }
       function removeFromSelection(card) {
         if (selectedCards.has(card)) {
           selectedCards.delete(card);
           card.classList.remove('selected');
+          updateDeleteBtn();
         }
       }
       function replaceSelection(cards) {
@@ -266,6 +276,17 @@
 
         // Interactions
         card.addEventListener('pointerdown', (e) => {
+          // Double-tap to edit (touch equivalent of dblclick)
+          const now = Date.now();
+          if (lastTap.card === card && now - lastTap.time < 350) {
+            lastTap = { card: null, time: 0 };
+            e.preventDefault();
+            const t = prompt('Edit text', card.textContent);
+            if (t !== null) { const newText = t.trim(); if (newText.length > 0) card.textContent = newText; }
+            return;
+          }
+          lastTap = { card, time: now };
+
           const multiKey = e.ctrlKey || e.metaKey; // Ctrl (Windows/Linux) or Cmd (macOS)
 
           // Toggle selection with Ctrl/Cmd; otherwise select only this card
@@ -333,7 +354,6 @@
           curY: e.clientY - bRect.top,
           addMode: (e.shiftKey || e.ctrlKey || e.metaKey)
         };
-        marqueeEl.style.display = 'block';
         marqueeEl.style.left = `${marquee.startX}px`;
         marqueeEl.style.top  = `${marquee.startY}px`;
         marqueeEl.style.width  = `0px`;
@@ -364,6 +384,12 @@
           const bRect = board.getBoundingClientRect();
           marquee.curX = e.clientX - bRect.left;
           marquee.curY = e.clientY - bRect.top;
+
+          // Dead zone — prevents a tap on empty space triggering a phantom marquee
+          const dx = Math.abs(marquee.curX - marquee.startX);
+          const dy = Math.abs(marquee.curY - marquee.startY);
+          if (dx < 8 && dy < 8) return;
+          marqueeEl.style.display = 'block';
 
           const left = Math.min(marquee.startX, marquee.curX);
           const top  = Math.min(marquee.startY, marquee.curY);
@@ -434,6 +460,7 @@
             if (selectedCards.size > 0) {
               selectedCards.forEach(c => c.remove());
               selectedCards.clear();
+              updateDeleteBtn();
               e.preventDefault();
             }
             break;
@@ -511,6 +538,14 @@
         a.click();
         a.remove();
         setTimeout(() => URL.revokeObjectURL(url), 500);
+      });
+
+      /** Delete selected **/
+      deleteBtn.addEventListener('click', () => {
+        if (selectedCards.size === 0) return;
+        selectedCards.forEach(c => c.remove());
+        selectedCards.clear();
+        updateDeleteBtn();
       });
 
       /** Clear all **/
