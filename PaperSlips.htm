@@ -106,6 +106,11 @@
       outline: 2px dashed var(--accent);
       outline-offset: 2px;
     }
+    .card.heading {
+      font-size: 26px;
+      font-weight: 700;
+      max-width: 360px;
+    }
     @keyframes pop-in {
       from { transform: scale(0.9); opacity: 0; }
       to   { transform: scale(1.0); opacity: 1; }
@@ -127,7 +132,7 @@
   </div>
 
   <div id="toolbar" role="group" aria-label="Controls">
-    <input id="entry" type="text" placeholder="Type words or comma‑separated phrases, then press Enter…" aria-label="Add words or phrases" />
+    <input id="entry" type="text" placeholder="word, phrase, # Heading  —  use \, for a literal comma" aria-label="Add words or phrases" />
     <button id="addBtn" title="Add to board">Add</button>
     <button id="importBtn" title="Import CSV">Import</button>
     <button id="exportBtn" title="Export CSV">Export</button>
@@ -159,11 +164,28 @@
 
       /** Helpers **/
       function splitInputToItems(text) {
-        // First version behavior: split on commas only
+        // \, = literal comma (not a split point)
+        const PH = '\x00';
         return text
-          .split(",")
-          .map(s => s.trim())
+          .replace(/\\,/g, PH)
+          .split(',')
+          .map(s => s.trim().replace(/\x00/g, ','))
           .filter(s => s.length > 0);
+      }
+
+      /** Apply text + heading style to a card from its raw stored text **/
+      function renderCard(card, rawText) {
+        card.dataset.raw = rawText;
+        if (/^# /.test(rawText)) {
+          card.classList.add('heading');
+          card.textContent = rawText.slice(2);
+        } else if (rawText.startsWith('\\#')) {
+          card.classList.remove('heading');
+          card.textContent = rawText.slice(1); // strip backslash, show literal #
+        } else {
+          card.classList.remove('heading');
+          card.textContent = rawText;
+        }
       }
       function clamp(val, min, max) { return Math.max(min, Math.min(max, val)); }
       function snap(n) { return Math.round(n / GRID) * GRID; }
@@ -247,7 +269,7 @@
       function createCard(text, x = null, y = null) {
         const card = document.createElement('div');
         card.className = 'card';
-        card.textContent = text;
+        renderCard(card, text);
 
         // Position: if not provided, place near centre-ish with slight jitter
         const bRect = board.getBoundingClientRect();
@@ -281,8 +303,8 @@
           if (lastTap.card === card && now - lastTap.time < 350) {
             lastTap = { card: null, time: 0 };
             e.preventDefault();
-            const t = prompt('Edit text', card.textContent);
-            if (t !== null) { const newText = t.trim(); if (newText.length > 0) card.textContent = newText; }
+            const t = prompt('Edit text', card.dataset.raw ?? card.textContent);
+            if (t !== null) { const newText = t.trim(); if (newText.length > 0) renderCard(card, newText); }
             return;
           }
           lastTap = { card, time: now };
@@ -330,10 +352,10 @@
         });
 
         card.addEventListener('dblclick', () => {
-          const t = prompt('Edit text', card.textContent);
+          const t = prompt('Edit text', card.dataset.raw ?? card.textContent);
           if (t !== null) {
             const newText = t.trim();
-            if (newText.length > 0) card.textContent = newText;
+            if (newText.length > 0) renderCard(card, newText);
           }
         });
 
@@ -525,7 +547,7 @@
         document.querySelectorAll('.card').forEach(card => {
           const x = parseInt(card.style.left || '0', 10);
           const y = parseInt(card.style.top  || '0', 10);
-          rows.push([card.textContent, x, y]);
+          rows.push([card.dataset.raw ?? card.textContent, x, y]);
         });
         const csv = rows.map(r => r.map(csvEscape).join(',')).join('\n');
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
